@@ -30,6 +30,11 @@ wgpu::BindGroup gBindGroup;
 wgpu::BindGroupLayout gBindGroupLayout;
 float4x4                                gPrevViewProjectionMatrix;
 
+float3          gCameraLookAt;
+float3          gCameraPosition;
+float3          gCameraUp;
+float           gfSpeed;
+
 /*
 **
 */
@@ -189,6 +194,9 @@ void render()
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
     cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
+
+    gCamera.setLookAt(gCameraLookAt);
+    gCamera.setPosition(gCameraPosition);
     gCamera.update(cameraInfo);
 
     Render::CRenderer::DrawUpdateDescriptor drawDesc = {};
@@ -242,8 +250,8 @@ void initGraphics()
     configureSurface();
     createRenderPipeline();
 
-    gCamera.setLookAt(float3(0.0f, 0.0f, -100.0f));
-    gCamera.setPosition(float3(0.0f, 0.0f, 1.5f));
+    gCamera.setLookAt(gCameraLookAt);
+    gCamera.setPosition(gCameraPosition);
 }
 
 /*
@@ -262,11 +270,73 @@ void start()
         return;
     }
 
+    gCameraLookAt = float3(0.0f, 0.0f, -100.0f);
+    gCameraPosition = float3(0.0f, 0.0f, 1.5f);
+    gCameraUp = float3(0.0f, 1.0f, 0.0f);
+    gfSpeed = 0.01f;
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window =
         glfwCreateWindow(kWidth, kHeight, "WebGPU window", nullptr, nullptr);
 
     surface = wgpu::glfw::CreateSurfaceForWindow(instance, window);
+
+    auto keyCallBack = [](GLFWwindow* window, int key, int scancode, int action, int mods)
+    {
+        switch(key)
+        {
+            case GLFW_KEY_W:
+            {
+                float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
+                gCameraPosition += viewDir * gfSpeed;
+                gCameraLookAt += viewDir * gfSpeed;
+
+                break;
+            }
+
+            case GLFW_KEY_S:
+            {
+                float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
+                gCameraPosition += viewDir * -gfSpeed;
+                gCameraLookAt += viewDir * -gfSpeed;
+
+                break;
+            }
+
+            case GLFW_KEY_A:
+            {
+                float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
+                float3 tangent = cross(gCameraUp, viewDir);
+                float3 binormal = cross(viewDir, tangent);
+
+                gCameraPosition += tangent * -gfSpeed;
+                gCameraLookAt += tangent * -gfSpeed;
+
+                break;
+            }
+
+            case GLFW_KEY_D:
+            {
+                float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
+                float3 tangent = cross(gCameraUp, viewDir);
+                float3 binormal = cross(viewDir, tangent);
+
+                gCameraPosition += tangent * gfSpeed;
+                gCameraLookAt += tangent * gfSpeed;
+
+                break;
+            }
+        }
+
+        float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
+        if(fabsf(viewDir.y) >= 0.9f)
+        {
+            gCameraUp = float3(1.0f, 0.0f, 0.0f);
+        }
+    };
+
+    glfwSetKeyCallback(window, keyCallBack);
+
 #endif // __EMSCRIPTEN__
 
     initGraphics();
@@ -295,9 +365,6 @@ int main()
 
     wgpu::RequestAdapterOptions adapterOptions = {};
     adapterOptions.backendType = wgpu::BackendType::Vulkan;
-    //adapterOptions.featureLevel = wgpu::FeatureLevel::Compatibility;
-    //adapterOptions.forceFallbackAdapter = true;
-    //adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
     wgpu::Future future = instance.RequestAdapter(
         &adapterOptions,
         wgpu::CallbackMode::WaitAnyOnly,
