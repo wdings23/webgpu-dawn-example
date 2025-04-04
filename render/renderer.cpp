@@ -281,16 +281,24 @@ namespace Render
                 
                 if(pRenderJob->mPassType == Render::PassType::DrawMeshes)
                 {
-                    for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
-                    {
-                        uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
-                        uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
-                        //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
-                        renderPassEncoder.DrawIndexedIndirect(
-                            maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
-                            iMesh * 5 * sizeof(uint32_t)
-                        );
-                    }
+                    //for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
+                    //{
+                    //    uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
+                    //    uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
+                    //    //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
+                    //    renderPassEncoder.DrawIndexedIndirect(
+                    //        maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
+                    //        iMesh * 5 * sizeof(uint32_t)
+                    //    );
+                    //}
+
+                    renderPassEncoder.MultiDrawIndexedIndirect(
+                        maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
+                        0,
+                        100,
+                        maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Num Draw Calls"],
+                        0
+                    );
                 }
 
                 renderPassEncoder.PopDebugGroup();

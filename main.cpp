@@ -1,5 +1,6 @@
 #include <GLFW/glfw3.h>
 #include <webgpu/webgpu_cpp.h>
+#include <webgpu/webgpu_cpp_print.h>
 #include <iostream>
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
@@ -311,16 +312,25 @@ int main()
     );
     instance.WaitAny(future, UINT64_MAX);
 
+    wgpu::Bool bHasMultiDrawIndirect = adapter.HasFeature(wgpu::FeatureName::MultiDrawIndirect);
+
     // be able to set user given labels for objects
     char const* aszToggleNames[] =
     {
-        "use_user_defined_labels_in_backend"
+        "use_user_defined_labels_in_backend",
+        "allow_unsafe_apis"
+    };
+    wgpu::FeatureName aFeatureNames[] =
+    {
+        wgpu::FeatureName::MultiDrawIndirect
     };
     wgpu::DawnTogglesDescriptor toggleDesc = {};
     toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;
-    toggleDesc.enabledToggleCount = 1;
+    toggleDesc.enabledToggleCount = sizeof(aszToggleNames) / sizeof(*aszToggleNames);
     wgpu::DeviceDescriptor deviceDesc = {};
     deviceDesc.nextInChain = &toggleDesc;
+    deviceDesc.requiredFeatures = aFeatureNames;
+    deviceDesc.requiredFeatureCount = sizeof(aFeatureNames) / sizeof(*aFeatureNames);
 
     deviceDesc.SetUncapturedErrorCallback(
         [](wgpu::Device const& device,
@@ -344,6 +354,9 @@ int main()
         {
             if(status != wgpu::RequestDeviceStatus::Success)
             {
+                DEBUG_PRINTF("!!! error creating device %d -- message: \"%s\" !!!\n",
+                    status,
+                    message.data);
                 assert(0);
             }
             device = std::move(d);
