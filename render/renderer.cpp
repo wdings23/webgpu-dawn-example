@@ -295,7 +295,7 @@ namespace Render
                     renderPassEncoder.MultiDrawIndexedIndirect(
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
                         0,
-                        100,
+                        65536,
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Num Draw Calls"],
                         0
                     );
@@ -320,7 +320,10 @@ namespace Render
                         pRenderJob->maBindGroups[iGroup]);
                 }
                 computePassEncoder.SetPipeline(pRenderJob->mComputePipeline);
-                computePassEncoder.DispatchWorkgroups(1, 1, 1);
+                computePassEncoder.DispatchWorkgroups(
+                    pRenderJob->mDispatchSize.x,
+                    pRenderJob->mDispatchSize.y,
+                    pRenderJob->mDispatchSize.z);
                 
                 computePassEncoder.PopDebugGroup();
                 computePassEncoder.End();
@@ -376,7 +379,6 @@ namespace Render
         }
 
         std::vector<std::string> aRenderJobNames;
-
         std::vector<std::string> aShaderModuleFilePath;
 
         auto const& jobs = doc["Jobs"].GetArray();
@@ -427,6 +429,17 @@ namespace Render
 
             maRenderJobs[createInfo.mName] = std::make_unique<Render::CRenderJob>();
             maRenderJobs[createInfo.mName]->createWithOnlyOutputAttachments(createInfo);
+
+            if(jobType == "Compute")
+            {
+                if(job.HasMember("Dispatch"))
+                {
+                    auto dispatchArray = job["Dispatch"].GetArray();
+                    maRenderJobs[createInfo.mName]->mDispatchSize.x = dispatchArray[0].GetUint();
+                    maRenderJobs[createInfo.mName]->mDispatchSize.y = dispatchArray[1].GetUint();
+                    maRenderJobs[createInfo.mName]->mDispatchSize.z = dispatchArray[2].GetUint();
+                }
+            }
 
             aRenderJobNames.push_back(createInfo.mName);
         }

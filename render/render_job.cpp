@@ -614,6 +614,36 @@ namespace Render
             mDepthStencilState.format = wgpu::TextureFormat::Depth32Float;
             mRenderPipeline = createInfo.mpDevice->CreateRenderPipeline(&pipelineDescriptor);
             mRenderPipeline.SetLabel(pipelineDescriptor.label);
+
+            // depth texture
+            mDepthStencilViewFormat = wgpu::TextureFormat::Depth32Float;
+            wgpu::TextureDescriptor depthStencilDesc = {};
+            depthStencilDesc.dimension = wgpu::TextureDimension::e2D;
+            depthStencilDesc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+            depthStencilDesc.format = wgpu::TextureFormat::Depth32Float;
+            depthStencilDesc.viewFormats = &mDepthStencilViewFormat;
+            depthStencilDesc.size.width = createInfo.miScreenWidth;
+            depthStencilDesc.size.height = createInfo.miScreenHeight;
+            depthStencilDesc.size.depthOrArrayLayers = 1;
+            mDepthStencilTexture = createInfo.mpDevice->CreateTexture(&depthStencilDesc);
+
+            mOutputImageAttachments["Depth-Texture"] = mDepthStencilTexture;
+
+            // dpeth texture view
+            wgpu::TextureViewDescriptor depthStencilViewDesc = {};
+            depthStencilViewDesc.format = wgpu::TextureFormat::Depth32Float;
+            depthStencilViewDesc.mipLevelCount = 1;
+            depthStencilViewDesc.arrayLayerCount = 1;
+            depthStencilViewDesc.dimension = wgpu::TextureViewDimension::e2D;
+            mDepthStencilAttachment.view = mDepthStencilTexture.CreateView(&depthStencilViewDesc);
+            mDepthStencilAttachment.depthClearValue = 1.0f;
+            mDepthStencilAttachment.depthStoreOp = mStoreOp;
+            mDepthStencilAttachment.depthLoadOp = mLoadOp;
+
+            // render pass descriptor
+            mRenderPassDesc.colorAttachmentCount = (uint32_t)maOutputAttachments.size();
+            mRenderPassDesc.colorAttachments = maOutputAttachments.data();
+            mRenderPassDesc.depthStencilAttachment = &mDepthStencilAttachment;
         }
         else if(mType == JobType::Compute)
         {
@@ -634,33 +664,6 @@ namespace Render
             assert(!"handle this job type");
         }
 
-        // depth texture
-        mDepthStencilViewFormat = wgpu::TextureFormat::Depth32Float;
-        wgpu::TextureDescriptor depthStencilDesc = {};
-        depthStencilDesc.dimension = wgpu::TextureDimension::e2D;
-        depthStencilDesc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
-        depthStencilDesc.format = wgpu::TextureFormat::Depth32Float;
-        depthStencilDesc.viewFormats = &mDepthStencilViewFormat;
-        depthStencilDesc.size.width = createInfo.miScreenWidth;
-        depthStencilDesc.size.height = createInfo.miScreenHeight;
-        depthStencilDesc.size.depthOrArrayLayers = 1;
-        mDepthStencilTexture = createInfo.mpDevice->CreateTexture(&depthStencilDesc);
-
-        // dpeth texture view
-        wgpu::TextureViewDescriptor depthStencilViewDesc = {};
-        depthStencilViewDesc.format = wgpu::TextureFormat::Depth32Float;
-        depthStencilViewDesc.mipLevelCount = 1;
-        depthStencilViewDesc.arrayLayerCount = 1;
-        depthStencilViewDesc.dimension = wgpu::TextureViewDimension::e2D;
-        mDepthStencilAttachment.view = mDepthStencilTexture.CreateView(&depthStencilViewDesc);
-        mDepthStencilAttachment.depthClearValue = 1.0f;
-        mDepthStencilAttachment.depthStoreOp = mStoreOp;
-        mDepthStencilAttachment.depthLoadOp = mLoadOp;
-
-        // render pass descriptor
-        mRenderPassDesc.colorAttachmentCount = (uint32_t)maOutputAttachments.size();
-        mRenderPassDesc.colorAttachments = maOutputAttachments.data();
-        mRenderPassDesc.depthStencilAttachment = &mDepthStencilAttachment;
         
     }
 

@@ -184,7 +184,7 @@ void render()
     CameraUpdateInfo cameraInfo = {};
     cameraInfo.mfFar = 100.0f;
     cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
-    cameraInfo.mfNear = 1.0f;
+    cameraInfo.mfNear = 0.3f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
@@ -235,17 +235,15 @@ void initGraphics()
     desc.miScreenWidth = kWidth;
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
-    desc.mMeshFilePath = "train6-triangles.bin";
+    desc.mMeshFilePath = "Vinci_SurfacePro11-triangles.bin";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     gRenderer.setup(desc);
     
     configureSurface();
     createRenderPipeline();
 
-    gCamera.setFar(100.0f);
-    gCamera.setNear(1.0f);
     gCamera.setLookAt(float3(0.0f, 0.0f, -100.0f));
-    gCamera.setPosition(float3(0.0f, 0.0f, 4.0f));
+    gCamera.setPosition(float3(0.0f, 0.0f, 1.5f));
 }
 
 /*
@@ -332,6 +330,9 @@ int main()
     {
         wgpu::FeatureName::MultiDrawIndirect
     };
+    wgpu::Limits requireLimits = {};
+    requireLimits.maxBufferSize = 1000000000;
+      
     wgpu::DawnTogglesDescriptor toggleDesc = {};
     toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;
     toggleDesc.enabledToggleCount = sizeof(aszToggleNames) / sizeof(*aszToggleNames);
@@ -339,7 +340,8 @@ int main()
     deviceDesc.nextInChain = &toggleDesc;
     deviceDesc.requiredFeatures = aFeatureNames;
     deviceDesc.requiredFeatureCount = sizeof(aFeatureNames) / sizeof(*aFeatureNames);
-    
+    deviceDesc.requiredLimits = &requireLimits;
+
     deviceDesc.SetUncapturedErrorCallback(
         [](wgpu::Device const& device,
             wgpu::ErrorType errorType,

@@ -43,7 +43,7 @@ namespace Render
 
 	protected:
 		wgpu::SurfaceTexture* mpSwapChain;
-		uint3													mDispatchSize;
+		uint3													mDispatchSize = uint3(1, 1, 1);
 
 		std::map<std::string, wgpu::Texture>					mOutputImageAttachments;
 		std::map<std::string, wgpu::Texture*>					mInputImageAttachments;
