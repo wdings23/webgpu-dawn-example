@@ -33,6 +33,8 @@ namespace Render
 			std::string											mPipelineFilePath;
 			Render::JobType											mJobType;
 			Render::PassType										mPassType;
+
+			wgpu::Sampler*											mpSampler;
 		};
 	public:
 		CRenderJob() = default;

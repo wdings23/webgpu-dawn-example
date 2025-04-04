@@ -20,6 +20,7 @@ namespace Render
             uint32_t miScreenHeight;
             std::string mMeshFilePath;
             std::string mRenderJobPipelineFilePath;
+            wgpu::Sampler* mpSampler;
         };
 
         struct DrawUpdateDescriptor
@@ -50,6 +51,12 @@ namespace Render
             uint32_t iDataSize);
 
         void highLightSelectedMesh(int32_t iX, int32_t iY);
+
+        inline void setExplosionMultiplier(float fMult)
+        {
+            mfExplosionMult = fMult;
+            mbUpdateUniform = true;
+        }
 
     protected:
         void createRenderJobs(CreateDescriptor& desc);
@@ -82,10 +89,27 @@ namespace Render
 
         wgpu::Instance*                         mpInstance;
 
+        wgpu::Sampler*                          mpSampler;
+
     protected:
         std::string                             mCaptureImageName = "";
         std::string                             mCaptureImageJobName = "";
-        int2                                    mSelectedCoord;
+        std::string                             mCaptureUniformBufferName = "";
+        int2                                    mSelectedCoord = int2(-1, -1);
         wgpu::Buffer                            mOutputImageBuffer;
+        
+        struct SelectMeshInfo
+        {
+            int32_t miMeshID;
+            int32_t miSelectionCoordX;
+            int32_t miSelectionCoordY;
+        };
+        SelectMeshInfo                          mSelectMeshInfo;
+        
+        float                                   mfExplosionMult = 1.0f;
+        bool                                    mbWaitingForMeshSelection = false;
+        bool                                    mbUpdateUniform = false;
+    
+        uint32_t                                miStartCaptureFrame = 0;
     };
 }   // Render

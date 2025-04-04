@@ -116,6 +116,14 @@ namespace Render
                 mAttachmentOrder.push_back(std::make_pair(attachmentName, std::make_pair(attachmentType, "r32float")));
                 mOutputBufferAttachments[attachmentName].SetLabel(attachmentName.c_str());
             }
+            else if(attachmentType == "TextureInput")
+            {
+                mAttachmentOrder.push_back(std::make_pair(attachmentName, std::make_pair(attachmentType, "parentFormat")));
+            }
+            else if(attachmentType == "BufferInput")
+            {
+                mAttachmentOrder.push_back(std::make_pair(attachmentName, std::make_pair(attachmentType, "parentFormat")));
+            }
         }
 
         auto const& aShaderResources = doc["ShaderResources"].GetArray();
@@ -143,6 +151,10 @@ namespace Render
                     else if(shaderUsage == "uniform")
                     {
                         bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+                    }
+                    else if(shaderUsage == "read_write_storage")
+                    {
+                        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
                     }
                     mUniformBuffers[shaderResourceName] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
                 }
@@ -198,6 +210,10 @@ namespace Render
             {
                 mDepthStencilState.depthCompare = wgpu::CompareFunction::Always;
             }
+
+            mDepthStencilState.depthBias = -1;
+            mDepthStencilState.depthBiasSlopeScale = 0.5f;
+            mDepthStencilState.depthBiasClamp = 1.0f;
 
         }
         
@@ -297,14 +313,18 @@ namespace Render
             
             if(mType == Render::JobType::Graphics)
             {
-                std::string attchmentFormat = attachment["Format"].GetString();
+                std::string attachmentFormat = ""; 
+                if(attachment.HasMember("Format"))
+                {
+                    attachmentFormat = attachment["Format"].GetString();
+                }
 
                 wgpu::TextureFormat format = wgpu::TextureFormat::RGBA32Float;
-                if(attchmentFormat == "rgba16float")
+                if(attachmentFormat == "rgba16float")
                 {
                     format = wgpu::TextureFormat::RGBA16Float;
                 }
-                else if(attchmentFormat == "rg16float")
+                else if(attachmentFormat == "rg16float")
                 {
                     format = wgpu::TextureFormat::RG16Float;
                 }
@@ -422,6 +442,8 @@ namespace Render
         
         std::vector<std::vector<wgpu::BindGroupEntry>> aaBindingGroupEntries(2);
 
+        DEBUG_PRINTF("Render Job: \"%s\"\n", mName.c_str());
+
         // in/out attachments in group 0
         for(auto const& attachmentInfo : mAttachmentOrder)
         {
@@ -446,11 +468,14 @@ namespace Render
                 bindingLayout.texture.multisampled = false;
                 bindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
                 bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+                bindingLayout.visibility = wgpu::ShaderStage::Fragment;
 
                 wgpu::TextureView textureView = mInputImageAttachments[attachmentName]->CreateView();
                 bindGroupEntry.textureView = textureView;
                 
-                // TODO: sampler for bindGroupEntry
+                DEBUG_PRINTF("\tgroup 0 binding %d read texture \"%s\"\n",
+                    aaBindGroupLayoutEntries[0].size(),
+                    attachmentName.c_str());
             }
             else if(attachmentType == "TextureOutput")
             {
@@ -460,6 +485,10 @@ namespace Render
 
                 wgpu::TextureView textureView = mOutputImageAttachments[attachmentName].CreateView();
                 bindGroupEntry.textureView = textureView;
+
+                DEBUG_PRINTF("\tgroup 0 binding %d write texture \"%s\"\n",
+                    aaBindGroupLayoutEntries[0].size(),
+                    attachmentName.c_str());
             }
             else if(attachmentType == "BufferInput")
             {
@@ -471,6 +500,10 @@ namespace Render
                     bindingLayout.visibility = wgpu::ShaderStage::Compute;
                 }
                 bindGroupEntry.buffer = *mInputBufferAttachments[attachmentName];
+
+                DEBUG_PRINTF("\tgroup 0 binding %d read buffer \"%s\"\n",
+                    aaBindGroupLayoutEntries[0].size(),
+                    attachmentName.c_str());
             }
             else if(attachmentType == "BufferOutput")
             {
@@ -483,6 +516,10 @@ namespace Render
                 }
 
                 bindGroupEntry.buffer = mOutputBufferAttachments[attachmentName];
+
+                DEBUG_PRINTF("\tgroup 0 binding %d write buffer \"%s\"\n",
+                    aaBindGroupLayoutEntries[0].size(),
+                    attachmentName.c_str());
             }
 
             ++iIndex;
@@ -511,6 +548,10 @@ namespace Render
                 bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
 
                 bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
+
+                DEBUG_PRINTF("\tgroup 1 binding %d texture \"%s\"\n",
+                    aaBindGroupLayoutEntries[1].size(),
+                    uniformName.c_str());
             }
             else if(uniformType == "buffer")
             {
@@ -520,10 +561,18 @@ namespace Render
                 if(uniformUsage == "read_write_storage")
                 {
                     bindingLayout.buffer.type = wgpu::BufferBindingType::Storage;
+
+                    DEBUG_PRINTF("\tgroup 1 binding %d write buffer \"%s\"\n",
+                        aaBindGroupLayoutEntries[1].size(),
+                        uniformName.c_str());
                 }
                 else if(uniformUsage == "uniform")
                 {
                     bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
+
+                    DEBUG_PRINTF("\tgroup 1 binding %d uniform buffer \"%s\"\n",
+                        aaBindGroupLayoutEntries[1].size(),
+                        uniformName.c_str());
                 }
                 
                 bindGroupEntry.buffer = mUniformBuffers[uniformName];
@@ -534,7 +583,15 @@ namespace Render
             {
                 bindingLayout.visibility = wgpu::ShaderStage::Compute;
             }
+            else
+            {
+                if(uniformUsage == "read_write_storage")
+                {
+                    bindingLayout.visibility = wgpu::ShaderStage::Fragment;
+                }
+            }
             
+
             aaBindGroupLayoutEntries[1].push_back(bindingLayout);
             aaBindingGroupEntries[1].push_back(bindGroupEntry);
             ++iIndex;
@@ -559,6 +616,33 @@ namespace Render
 
             aaBindGroupLayoutEntries[1].push_back(bindingLayout);
             aaBindingGroupEntries[1].push_back(bindGroupEntry);
+
+            DEBUG_PRINTF("\tgroup 1 binding %d \"default uniform buffer\"\n",
+                iIndex);
+
+            ++iIndex;
+        }
+
+        // add sampler if there are textures
+        if(mOutputImageAttachments.size() > 0 || mUniformTextures.size() > 0)
+        {
+            wgpu::BindGroupEntry bindGroupEntry = {};
+            wgpu::BindGroupLayoutEntry bindingLayout = {};
+
+            bindGroupEntry.binding = iIndex;
+            bindGroupEntry.sampler = *createInfo.mpSampler;
+
+            bindingLayout.binding = iIndex;
+            bindingLayout.sampler.type = wgpu::SamplerBindingType::NonFiltering;
+            bindingLayout.visibility = wgpu::ShaderStage::Fragment;
+
+            aaBindGroupLayoutEntries[1].push_back(bindingLayout);
+            aaBindingGroupEntries[1].push_back(bindGroupEntry);
+
+            DEBUG_PRINTF("\tgroup 1 binding %d \"sampler\"\n",
+                iIndex);
+
+            ++iIndex;
         }
 
         // bind group layouts

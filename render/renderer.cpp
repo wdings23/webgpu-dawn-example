@@ -16,6 +16,8 @@
 #include <tinyexr/tinyexr.h>
 #include <tinyexr/miniz.c>
 
+#include <utils/LogPrint.h>
+
 struct Vertex
 {
     vec4        mPosition;
@@ -181,6 +183,7 @@ namespace Render
             aFullScreenTriangles, 
             3 * sizeof(Vertex));
 
+        mpSampler = desc.mpSampler;
         createRenderJobs(desc);
 
         device.GetQueue().WriteBuffer(
@@ -257,6 +260,7 @@ namespace Render
         defaultUniformData.miScreenHeight = (int32_t)mCreateDesc.miScreenHeight;
         defaultUniformData.miFrame = miFrame;
 
+        // update default uniform buffer
         mpDevice->GetQueue().WriteBuffer(
             maBuffers["default-uniform-buffer"],
             0,
@@ -273,6 +277,65 @@ namespace Render
             sizeof(acClearData)
         );
 
+        struct MeshSelectionUniformData
+        {
+            int32_t miSelectedMesh;
+            int32_t miSelectionX;
+            int32_t miSelectionY;
+        };
+
+        // changes need to be accounted for in uniform
+        if(mbUpdateUniform)
+        {
+            struct UniformData
+            {
+                uint32_t miNumMeshes;
+                float mfExplodeMultiplier;
+            };
+
+            UniformData uniformBuffer;
+            uniformBuffer.miNumMeshes = (uint32_t)maMeshExtents.size();
+            uniformBuffer.mfExplodeMultiplier = mfExplosionMult;
+
+            mpDevice->GetQueue().WriteBuffer(
+                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["indirectUniformData"],
+                0,
+                &uniformBuffer,
+                sizeof(UniformData)
+            );
+        }
+
+        // fill out uniform data for buffer for highlighting mesh
+        {
+            if(mCaptureImageJobName.length() > 0)
+            {
+                // start selection, inform the shader to start looking for selected mesh at coordinate
+
+                MeshSelectionUniformData uniformBuffer;
+                uniformBuffer.miSelectionX = mSelectedCoord.x;
+                uniformBuffer.miSelectionY = mSelectedCoord.y;
+                uniformBuffer.miSelectedMesh = -1;
+
+                mpDevice->GetQueue().WriteBuffer(
+                    maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
+                    0,
+                    &uniformBuffer,
+                    sizeof(MeshSelectionUniformData)
+                );
+
+                mbWaitingForMeshSelection = true;
+                mSelectedCoord = int2(-1, -1);
+                
+                if(mCaptureImageJobName.length() > 0 && miFrame - miStartCaptureFrame > 3)
+                {
+                    miStartCaptureFrame = miFrame;
+                }
+
+                mbUpdateUniform = false;
+            }
+        }
+        
+        // add commands from the render jobs
         std::vector<wgpu::CommandBuffer> aCommandBuffer;
         for(auto const& renderJobName : maOrderedRenderJobs)
         {
@@ -341,6 +404,10 @@ namespace Render
                         0
                     );
                 }
+                else if(pRenderJob->mPassType == Render::PassType::FullTriangle)
+                {
+                    renderPassEncoder.Draw(3);
+                }
 
                 renderPassEncoder.PopDebugGroup();
                 renderPassEncoder.End();
@@ -374,35 +441,18 @@ namespace Render
             aCommandBuffer.push_back(commandBuffer);
         }
 
-        // copy output attachment
-        if(mCaptureImageName.length() > 0)
+        // get selection info from shader via read back buffer
+        if(mbWaitingForMeshSelection)
         {
             wgpu::CommandEncoderDescriptor commandEncoderDesc = {};
             wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
 
-            wgpu::TexelCopyTextureInfo textureInfo = {};
-            textureInfo.texture = maRenderJobs[mCaptureImageJobName]->mOutputImageAttachments[mCaptureImageName];
-            textureInfo.origin.x = 0;
-            textureInfo.origin.y = 0;
-            textureInfo.origin.z = 0;
-            textureInfo.aspect = wgpu::TextureAspect::All;
-
-            wgpu::TexelCopyBufferLayout bufferLayout = {};
-            bufferLayout.bytesPerRow = sizeof(float4) * mCreateDesc.miScreenWidth;
-            bufferLayout.offset = 0;
-            bufferLayout.rowsPerImage = mCreateDesc.miScreenHeight;
-            wgpu::TexelCopyBufferInfo imageBufferInfo = {};
-            imageBufferInfo.buffer = mOutputImageBuffer;
-            imageBufferInfo.layout = bufferLayout;
-            wgpu::Extent3D outputTextureSize = {};
-            outputTextureSize.width = mCreateDesc.miScreenWidth;
-            outputTextureSize.height = mCreateDesc.miScreenHeight;
-            outputTextureSize.depthOrArrayLayers = 1;
-
-            commandEncoder.CopyTextureToBuffer(
-                &textureInfo,
-                &imageBufferInfo,
-                &outputTextureSize
+            commandEncoder.CopyBufferToBuffer(
+                maRenderJobs[mCaptureImageJobName]->mUniformBuffers[mCaptureUniformBufferName],
+                0,
+                mOutputImageBuffer,
+                0,
+                256
             );
 
             wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
@@ -414,47 +464,37 @@ namespace Render
             (uint32_t)aCommandBuffer.size(), 
             aCommandBuffer.data());
 
-#if 0
-        // wait until done
-        static bool sbWorkDone;
-        sbWorkDone = false;
-        mpDevice->GetQueue().OnSubmittedWorkDone(
-            [](WGPUQueueWorkDoneStatus status, void* userdata)
-            {
-                sbWorkDone = true;
-            },
-            nullptr
-        );
-
-        while(sbWorkDone == false);
-#endif // #if 0
-
-        if(mCaptureImageName.length() > 0)
+        // mouse selection state, get the selected mesh from the shader
+        if(mbWaitingForMeshSelection)
         {
             auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
             {
                 if(status == wgpu::MapAsyncStatus::Success)
                 {
                     wgpu::BufferMapState mapState = mOutputImageBuffer.GetMapState();
-
-                    float4 const* pImageData = (float4 const*)mOutputImageBuffer.GetConstMappedRange();
-                    assert(pImageData);
-                    uint32_t iImageIndex = mSelectedCoord.y * mCreateDesc.miScreenWidth + mSelectedCoord.x;
-                    uint32_t iMesh = uint32_t(pImageData[iImageIndex].w);
                     
-                    char const* pError = nullptr;
-                    int32_t iRet = SaveEXR(
-                        (float const*)pImageData,
-                        mCreateDesc.miScreenWidth,
-                        mCreateDesc.miScreenHeight,
-                        4,
-                        0,
-                        "d:\\test\\github-projects\\test_assets\\world-output.exr",
-                        &pError);
-                    int iDebug = 1;
+                    SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange();
+                    memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
+                    mSelectMeshInfo.miMeshID -= 1;
+                    mOutputImageBuffer.Unmap();
+
+                    if(miFrame - miStartCaptureFrame >= 3)
+                    {
+                        // reset to signal we're done
+                        mCaptureImageJobName = "";
+                        mCaptureImageName = "";
+                        mCaptureUniformBufferName = "";
+                        mbWaitingForMeshSelection = false;
+                    }
+
+                    DEBUG_PRINTF("!!! selected mesh: %d coordinate (%d, %d) !!!\n", 
+                        pInfo->miMeshID,
+                        pInfo->miSelectionCoordX,
+                        pInfo->miSelectionCoordY);
                 }
             };
 
+            // read back mesh selection buffer from shader
             uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
             wgpu::Future future = mOutputImageBuffer.MapAsync(
                 wgpu::MapMode::Read,
@@ -466,8 +506,23 @@ namespace Render
             assert(mpInstance);
             mpInstance->WaitAny(future, UINT64_MAX);
 
-            mCaptureImageJobName = "";
-            mCaptureImageName = "";
+            // update uniform buffer, signalling selection is done
+            if(miFrame - miStartCaptureFrame >= 3)
+            {
+                mSelectedCoord.x = mSelectedCoord.y = -1;
+
+                MeshSelectionUniformData uniformBuffer;
+                uniformBuffer.miSelectionX = mSelectedCoord.x;
+                uniformBuffer.miSelectionY = mSelectedCoord.y;
+                uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
+
+                mpDevice->GetQueue().WriteBuffer(
+                    maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
+                    0,
+                    &uniformBuffer,
+                    sizeof(MeshSelectionUniformData)
+                );
+            }
         }
 
         ++miFrame;
@@ -539,6 +594,8 @@ namespace Render
 
             std::string pipelineFilePath = std::string("render-jobs/") + job["Pipeline"].GetString();
             createInfo.mPipelineFilePath = pipelineFilePath;
+
+            createInfo.mpSampler = desc.mpSampler;
 
             aShaderModuleFilePath.push_back(pipelineFilePath);
 
@@ -625,8 +682,9 @@ namespace Render
     */
     void CRenderer::highLightSelectedMesh(int32_t iX, int32_t iY)
     {
-        mCaptureImageName = "World Position Output";
-        mCaptureImageJobName = "Deferred Indirect Graphics";
+        mCaptureImageName = "Selection Output";
+        mCaptureImageJobName = "Mesh Selection Graphics";
+        mCaptureUniformBufferName = "selectedMesh";
 
         mSelectedCoord = int2(iX, iY);
 

@@ -25,6 +25,15 @@ wgpu::TextureFormat format;
 const uint32_t kWidth = 512;
 const uint32_t kHeight = 512;
 
+struct UniformData
+{
+    uint32_t miNumMeshes;
+    float mfExplodeMultiplier;
+    int32_t miSelectionX;
+    int32_t miSelectionY;
+    int32_t miSelectedMesh;
+};
+
 CCamera gCamera;
 Render::CRenderer gRenderer;
 wgpu::Sampler gSampler;
@@ -140,9 +149,6 @@ void createRenderPipeline()
         .targets = &colorTargetState
     };
 
-    wgpu::SamplerDescriptor samplerDesc = {};
-    gSampler = device.CreateSampler(&samplerDesc);
-
     // swap chain binding layouts
     std::vector<wgpu::BindGroupLayoutEntry> aBindingLayouts;
     wgpu::BindGroupLayoutEntry textureLayout = {};
@@ -214,7 +220,7 @@ void render()
     CameraUpdateInfo cameraInfo = {};
     cameraInfo.mfFar = 100.0f;
     cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
-    cameraInfo.mfNear = 0.05f;
+    cameraInfo.mfNear = 0.01f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
@@ -264,6 +270,9 @@ void render()
 */
 void initGraphics() 
 {
+    wgpu::SamplerDescriptor samplerDesc = {};
+    gSampler = device.CreateSampler(&samplerDesc);
+
     Render::CRenderer::CreateDescriptor desc = {};
     desc.miScreenWidth = kWidth;
     desc.miScreenHeight = kHeight;
@@ -271,6 +280,7 @@ void initGraphics()
     desc.mpInstance = &instance;
     desc.mMeshFilePath = "Vinci_SurfacePro11";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
+    desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
     
     configureSurface();
@@ -357,23 +367,7 @@ void start()
             case GLFW_KEY_E:
             {
                 gfExplodeMultiplier += 1.0f;
-                bool bSuccess = gRenderer.setBufferData(
-                    "Deferred Indirect Graphics",
-                    "indirectUniformData",
-                    &gfExplodeMultiplier,
-                    (uint32_t)sizeof(uint32_t),
-                    (uint32_t)sizeof(float)
-                );
-                assert(bSuccess);
-
-                bSuccess = gRenderer.setBufferData(
-                    "Mesh Culling Compute",
-                    "uniformBuffer",
-                    &gfExplodeMultiplier,
-                    (uint32_t)sizeof(uint32_t),
-                    (uint32_t)sizeof(float)
-                );
-                assert(bSuccess);
+                gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
 
                 break;
             }
@@ -383,23 +377,7 @@ void start()
                 gfExplodeMultiplier -= 1.0f;
                 gfExplodeMultiplier = std::max(gfExplodeMultiplier, 1.0f);
 
-                bool bSuccess = gRenderer.setBufferData(
-                    "Deferred Indirect Graphics",
-                    "indirectUniformData",
-                    &gfExplodeMultiplier,
-                    (uint32_t)sizeof(uint32_t),
-                    (uint32_t)sizeof(float)
-                );
-                assert(bSuccess);
-
-                bSuccess = gRenderer.setBufferData(
-                    "Mesh Culling Compute",
-                    "uniformBuffer",
-                    &gfExplodeMultiplier,
-                    (uint32_t)sizeof(uint32_t),
-                    (uint32_t)sizeof(float)
-                );
-                assert(bSuccess);
+                gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
 
                 break;
             }
