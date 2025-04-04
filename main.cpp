@@ -42,13 +42,13 @@ uint32_t        giRightButtonHeld;
 
 int32_t         giLastX = -1;
 int32_t         giLastY = -1;
-float           gfRotationSpeed = 0.03f;
-
+float           gfRotationSpeed = 0.3f;
+float           gfExplodeMultiplier = 1.0f;
 
 
 float2 gCameraAngle(0.0f, 0.0f);
-float3 gInitialCameraPosition(0.0f, 0.0f, 3.0f);
-float3 gInitialCameraLookAt(0.0f, 0.0f, -100.0f);
+float3 gInitialCameraPosition(0.0f, 0.0f, -3.0f);
+float3 gInitialCameraLookAt(0.0f, 0.0f, 0.0f);
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -214,7 +214,7 @@ void render()
     CameraUpdateInfo cameraInfo = {};
     cameraInfo.mfFar = 100.0f;
     cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
-    cameraInfo.mfNear = 0.1f;
+    cameraInfo.mfNear = 0.05f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
@@ -268,7 +268,8 @@ void initGraphics()
     desc.miScreenWidth = kWidth;
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
-    desc.mMeshFilePath = "Vinci_SurfacePro11-triangles.bin";
+    desc.mpInstance = &instance;
+    desc.mMeshFilePath = "Vinci_SurfacePro11";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     gRenderer.setup(desc);
     
@@ -352,6 +353,56 @@ void start()
 
                 break;
             }
+
+            case GLFW_KEY_E:
+            {
+                gfExplodeMultiplier += 1.0f;
+                bool bSuccess = gRenderer.setBufferData(
+                    "Deferred Indirect Graphics",
+                    "indirectUniformData",
+                    &gfExplodeMultiplier,
+                    (uint32_t)sizeof(uint32_t),
+                    (uint32_t)sizeof(float)
+                );
+                assert(bSuccess);
+
+                bSuccess = gRenderer.setBufferData(
+                    "Mesh Culling Compute",
+                    "uniformBuffer",
+                    &gfExplodeMultiplier,
+                    (uint32_t)sizeof(uint32_t),
+                    (uint32_t)sizeof(float)
+                );
+                assert(bSuccess);
+
+                break;
+            }
+
+            case GLFW_KEY_Z:
+            {
+                gfExplodeMultiplier -= 1.0f;
+                gfExplodeMultiplier = std::max(gfExplodeMultiplier, 1.0f);
+
+                bool bSuccess = gRenderer.setBufferData(
+                    "Deferred Indirect Graphics",
+                    "indirectUniformData",
+                    &gfExplodeMultiplier,
+                    (uint32_t)sizeof(uint32_t),
+                    (uint32_t)sizeof(float)
+                );
+                assert(bSuccess);
+
+                bSuccess = gRenderer.setBufferData(
+                    "Mesh Culling Compute",
+                    "uniformBuffer",
+                    &gfExplodeMultiplier,
+                    (uint32_t)sizeof(uint32_t),
+                    (uint32_t)sizeof(float)
+                );
+                assert(bSuccess);
+
+                break;
+            }
         }
 
         float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
@@ -391,14 +442,23 @@ void start()
     {
         if(giLeftButtonHeld)
         {
+            int32_t iSelectedX = -1;
             if(giLastX == -1)
             {
                 giLastX = (int32_t)xpos;
+                iSelectedX = giLastX;
             }
 
+            int32_t iSelectedY = -1;
             if(giLastY == -1)
             {
                 giLastY = (int32_t)ypos;
+                iSelectedY = giLastY;
+            }
+
+            if(iSelectedX != -1 && iSelectedY != -1)
+            {
+                gRenderer.highLightSelectedMesh(iSelectedX, iSelectedY);
             }
 
             handleCameraMouseRotate((int32_t)xpos, (int32_t)ypos, giLastX, giLastY);

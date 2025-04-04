@@ -6,11 +6,15 @@
 #include <math/vec.h>
 #include <math/mat4.h>
 #include <loader/loader.h>
-
+#include <assert.h>
 
 #include <iostream>
 #include <string>
 #include <vector>
+
+#define TINYEXR_IMPLEMENTATION
+#include <tinyexr/tinyexr.h>
+#include <tinyexr/miniz.c>
 
 struct Vertex
 {
@@ -96,8 +100,7 @@ namespace Render
         wgpu::Device& device = *mpDevice;
 
         std::vector<char> acTriangleBuffer;
-        Loader::loadFile(acTriangleBuffer, desc.mMeshFilePath);
-
+        Loader::loadFile(acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
         uint32_t const* piData = (uint32_t const*)acTriangleBuffer.data();
         uint32_t iNumMeshes = *piData++;
         uint32_t iNumTotalVertices = *piData++;
@@ -192,12 +195,50 @@ namespace Render
             maMeshExtents.data(),
             maMeshExtents.size() * sizeof(MeshExtent));
 
-        uint32_t aiUniformData[] = {(uint32_t)maMeshExtents.size(), 0, 0, 0};
+        struct UniformData
+        {
+            uint32_t    miNumMeshes;
+            float       mfExplodeMultipler;
+        };
+
+        UniformData uniformData;
+        uniformData.miNumMeshes = (uint32_t)maMeshExtents.size();
+        uniformData.mfExplodeMultipler = 1.0f;
         device.GetQueue().WriteBuffer(
             maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["uniformBuffer"],
             0,
-            aiUniformData,
-            4 * sizeof(uint32_t));
+            &uniformData,
+            sizeof(UniformData));
+
+        {
+            std::vector<char> acMaterialID;
+            Loader::loadFile(acMaterialID, desc.mMeshFilePath + ".mid");
+            device.GetQueue().WriteBuffer(
+                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["meshMaterialIDs"],
+                0,
+                acMaterialID.data(),
+                acMaterialID.size());
+        }
+
+        {
+            std::vector<char> acMaterials;
+            Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");
+            device.GetQueue().WriteBuffer(
+                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["materials"],
+                0,
+                acMaterials.data(),
+                acMaterials.size());
+        }
+
+        {
+            device.GetQueue().WriteBuffer(
+                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["meshExtents"],
+                0,
+                maMeshExtents.data(),
+                maMeshExtents.size() * sizeof(MeshExtent));
+        }
+
+        mpInstance = desc.mpInstance;
     }
 
     /*
@@ -327,9 +368,42 @@ namespace Render
                 
                 computePassEncoder.PopDebugGroup();
                 computePassEncoder.End();
-
-                
             }
+
+            wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
+            aCommandBuffer.push_back(commandBuffer);
+        }
+
+        // copy output attachment
+        if(mCaptureImageName.length() > 0)
+        {
+            wgpu::CommandEncoderDescriptor commandEncoderDesc = {};
+            wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
+
+            wgpu::TexelCopyTextureInfo textureInfo = {};
+            textureInfo.texture = maRenderJobs[mCaptureImageJobName]->mOutputImageAttachments[mCaptureImageName];
+            textureInfo.origin.x = 0;
+            textureInfo.origin.y = 0;
+            textureInfo.origin.z = 0;
+            textureInfo.aspect = wgpu::TextureAspect::All;
+
+            wgpu::TexelCopyBufferLayout bufferLayout = {};
+            bufferLayout.bytesPerRow = sizeof(float4) * mCreateDesc.miScreenWidth;
+            bufferLayout.offset = 0;
+            bufferLayout.rowsPerImage = mCreateDesc.miScreenHeight;
+            wgpu::TexelCopyBufferInfo imageBufferInfo = {};
+            imageBufferInfo.buffer = mOutputImageBuffer;
+            imageBufferInfo.layout = bufferLayout;
+            wgpu::Extent3D outputTextureSize = {};
+            outputTextureSize.width = mCreateDesc.miScreenWidth;
+            outputTextureSize.height = mCreateDesc.miScreenHeight;
+            outputTextureSize.depthOrArrayLayers = 1;
+
+            commandEncoder.CopyTextureToBuffer(
+                &textureInfo,
+                &imageBufferInfo,
+                &outputTextureSize
+            );
 
             wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
             aCommandBuffer.push_back(commandBuffer);
@@ -354,6 +428,47 @@ namespace Render
 
         while(sbWorkDone == false);
 #endif // #if 0
+
+        if(mCaptureImageName.length() > 0)
+        {
+            auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
+            {
+                if(status == wgpu::MapAsyncStatus::Success)
+                {
+                    wgpu::BufferMapState mapState = mOutputImageBuffer.GetMapState();
+
+                    float4 const* pImageData = (float4 const*)mOutputImageBuffer.GetConstMappedRange();
+                    assert(pImageData);
+                    uint32_t iImageIndex = mSelectedCoord.y * mCreateDesc.miScreenWidth + mSelectedCoord.x;
+                    uint32_t iMesh = uint32_t(pImageData[iImageIndex].w);
+                    
+                    char const* pError = nullptr;
+                    int32_t iRet = SaveEXR(
+                        (float const*)pImageData,
+                        mCreateDesc.miScreenWidth,
+                        mCreateDesc.miScreenHeight,
+                        4,
+                        0,
+                        "d:\\test\\github-projects\\test_assets\\world-output.exr",
+                        &pError);
+                    int iDebug = 1;
+                }
+            };
+
+            uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
+            wgpu::Future future = mOutputImageBuffer.MapAsync(
+                wgpu::MapMode::Read,
+                0,
+                iFileSize,
+                wgpu::CallbackMode::WaitAnyOnly,
+                callBack);
+
+            assert(mpInstance);
+            mpInstance->WaitAny(future, UINT64_MAX);
+
+            mCaptureImageJobName = "";
+            mCaptureImageName = "";
+        }
 
         ++miFrame;
     }
@@ -470,9 +585,58 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
-        wgpu::Texture& swapChainTexture = maRenderJobs["Deferred Indirect Graphics"]->mOutputImageAttachments["Normal Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs["Deferred Indirect Graphics"]->mOutputImageAttachments["Clip Space Output"];
 
         return swapChainTexture;
+    }
+
+    /*
+    **
+    */
+    bool CRenderer::setBufferData(
+        std::string const& jobName,
+        std::string const& bufferName,
+        void* pData,
+        uint32_t iOffset,
+        uint32_t iDataSize)
+    {
+        bool bRet = false;
+
+        assert(maRenderJobs.find(jobName) != maRenderJobs.end());
+        Render::CRenderJob* pRenderJob = maRenderJobs[jobName].get();
+        if(pRenderJob->mUniformBuffers.find(bufferName) != pRenderJob->mUniformBuffers.end())
+        {
+            wgpu::Buffer uniformBuffer = pRenderJob->mUniformBuffers[bufferName];
+            mpDevice->GetQueue().WriteBuffer(
+                uniformBuffer,
+                iOffset,
+                pData,
+                iDataSize
+            );
+
+            bRet = true;
+        }
+
+        return bRet;
+    }
+
+    /*
+    **
+    */
+    void CRenderer::highLightSelectedMesh(int32_t iX, int32_t iY)
+    {
+        mCaptureImageName = "World Position Output";
+        mCaptureImageJobName = "Deferred Indirect Graphics";
+
+        mSelectedCoord = int2(iX, iY);
+
+        if(mOutputImageBuffer.Get() == nullptr)
+        {
+            wgpu::BufferDescriptor desc = {};
+            desc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
+            desc.size = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
+            mOutputImageBuffer = mpDevice->CreateBuffer(&desc);
+        }
     }
 
 }   // Render
