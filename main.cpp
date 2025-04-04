@@ -32,7 +32,7 @@ float4x4                                gPrevViewProjectionMatrix;
 /*
 **
 */
-void ConfigureSurface() 
+void configureSurface() 
 {
     wgpu::SurfaceCapabilities capabilities;
     surface.GetCapabilities(adapter, &capabilities);
@@ -49,198 +49,6 @@ void ConfigureSurface()
 
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
-    int iDebug = 1;
-}
-
-/*
-**
-*/
-void GetAdapter(void (*callback)(wgpu::Adapter))
-{
-    auto createdAdapterCallBack = [](
-        wgpu::RequestAdapterStatus status, 
-        wgpu::Adapter cAdapter, 
-        const char* message,
-        void* userData)
-        {
-            if(message)
-            {
-                DEBUG_PRINTF("!!! RequestAdapter: %s !!!!\n", message);
-            }
-            if(status == wgpu::RequestAdapterStatus::Success)
-            {
-                wgpu::Adapter adapter = wgpu::Adapter::Acquire(cAdapter.Get());
-                reinterpret_cast<void (*)(wgpu::Adapter)>(userData)(adapter);
-            }
-            
-        };
-
-    wgpu::RequestAdapterOptions options = {};
-    options.backendType = wgpu::BackendType::Vulkan;
-    //options.featureLevel = wgpu::FeatureLevel::Compatibility;
-    //options.forceFallbackAdapter = true;
-    //options.powerPreference = wgpu::PowerPreference::HighPerformance;
-    wgpu::Future future = instance.RequestAdapter(
-        &options,
-        wgpu::CallbackMode::WaitAnyOnly,
-        createdAdapterCallBack,
-        (void*)callback
-    );
-
-    instance.WaitAny(future, 1000000000);
-
-#if 0
-    wgpu::RequestAdapterOptions option = {};
-    option.backendType = wgpu::BackendType::Vulkan;
-    instance.RequestAdapter(
-        &option,
-        callBack,
-        &userData
-    );
-
-    instance.RequestAdapter(
-        &option,
-        wgpu::CallbackMode::WaitAnyOnly,
-        // TODO(https://bugs.chromium.org/p/dawn/issues/detail?id=1892): Use
-        // wgpu::RequestAdapterStatus and wgpu::Adapter.
-        [](WGPURequestAdapterStatus status, 
-            WGPUAdapter cAdapter,
-            char const* message, 
-            void* userdata) 
-        {
-                if(message) 
-                {
-                    printf("RequestAdapter: %s\n", message);
-                }
-                if(status != WGPURequestAdapterStatus_Success) 
-                {
-                    exit(0);
-                }
-                wgpu::Adapter adapter = wgpu::Adapter::Acquire(cAdapter);
-                reinterpret_cast<void (*)(wgpu::Adapter)>(userdata)(adapter);
-        },
-        callback);
-#endif // #if 0
-}
-
-/*
-**
-*/
-void GetDevice(void (*callback)(wgpu::Device))
-{
-    auto callBackUponDeviceCreation = [](
-        wgpu::RequestDeviceStatus status,
-        wgpu::Device cDevice,
-        wgpu::StringView message,
-        void* userData)
-    {
-        if(message.length)
-        {
-            DEBUG_PRINTF("RequestDevice: %s\n", message);
-        }
-        
-#if 0
-        auto cb = [](
-            wgpu::LoggingType type, const char* message)
-            {
-
-            };
-
-        device.SetLoggingCallback(
-            &cb
-        );
-
-        device.SetLoggingCallback(
-            &cb,
-            nullptr
-       );
-#endif // #if 0
-
-        //device.SetUncapturedErrorCallback(
-        //    [](WGPUErrorType type, const char* message, void* userData)
-        //    {
-        //        DEBUG_PRINTF("Error: %d - message: \"%s\"\n",
-        //            type,
-        //            message);
-        //        assert(0);
-        //    },
-        //    nullptr);
-        reinterpret_cast<void (*)(wgpu::Device)>(userData)(cDevice);
-    };
-
-    auto cb2 = [](
-        WGPURequestDeviceStatus status, 
-        WGPUDevice device, 
-        WGPUStringView message, 
-        void* callback_param, 
-        void* userdata_param
-    )
-    {
-
-    };
-
-    // be able to set user given labels for objects
-    char const* aszToggleNames[] =
-    {
-        "use_user_defined_labels_in_backend"
-    };
-    wgpu::DeviceDescriptor deviceDesc = {};
-    wgpu::DawnTogglesDescriptor toggleDesc = {};
-    toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;
-    toggleDesc.enabledToggleCount = 1;
-    deviceDesc.nextInChain = &toggleDesc;
-
-    wgpu::Future future = adapter.RequestDevice(
-        &deviceDesc,
-        wgpu::CallbackMode::WaitAnyOnly,
-        callBackUponDeviceCreation,
-        (void*)callback
-    );
-
-    instance.WaitAny(future, 10000000000);
-
-    auto callBack = [](
-        WGPURequestDeviceStatus status, 
-        WGPUDevice device, 
-        WGPUStringView message, 
-        void* callback_param, 
-        void* userData)
-    {
-
-    };
-#if 0
-    adapter.RequestDevice(
-        &deviceDesc,
-        wgpu::CallbackMode::AllowProcessEvents,
-        callback
-    );
-#endif // #if 0
-
-#if 0
-    adapter.RequestDevice(
-        &deviceDesc,
-        // TODO(https://bugs.chromium.org/p/dawn/issues/detail?id=1892): Use
-        // wgpu::RequestDeviceStatus and wgpu::Device.
-        [](WGPURequestDeviceStatus status, WGPUDevice cDevice,
-            const char* message, void* userdata) 
-        {
-                if(message) 
-                {
-                    printf("RequestDevice: %s\n", message);
-                }
-                wgpu::Device device = wgpu::Device::Acquire(cDevice);
-                device.SetUncapturedErrorCallback(
-                    [](WGPUErrorType type, const char* message, void* userdata) 
-                    {
-                        DEBUG_PRINTF("Error: %d - message: \"%s\"\n",
-                            type,
-                            message);
-                        assert(0);
-                    },
-                    nullptr);
-                reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
-        }, reinterpret_cast<void*>(callback));
-#endif // #if 0
 }
 
 const char shaderCode[] = R"(
@@ -276,7 +84,7 @@ const char shaderCode[] = R"(
 /*
 **
 */
-void CreateRenderPipeline() 
+void createRenderPipeline() 
 {
     wgpu::ShaderModuleWGSLDescriptor wgslDesc{};
     wgslDesc.code = shaderCode;
@@ -420,7 +228,7 @@ void render()
 /*
 **
 */
-void InitGraphics() 
+void initGraphics() 
 {
     Render::CRenderer::CreateDescriptor desc = {};
     desc.miScreenWidth = kWidth;
@@ -430,21 +238,19 @@ void InitGraphics()
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     gRenderer.setup(desc);
     
-    ConfigureSurface();
-    CreateRenderPipeline();
+    configureSurface();
+    createRenderPipeline();
 
     gCamera.setFar(100.0f);
     gCamera.setNear(1.0f);
     gCamera.setLookAt(float3(0.0f, 0.0f, -100.0f));
     gCamera.setPosition(float3(0.0f, 0.0f, 4.0f));
-
-    
 }
 
 /*
 **
 */
-void Start() 
+void start() 
 {
 #if defined(__EMSCRIPTEN__)
     wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc{};
@@ -464,7 +270,7 @@ void Start()
     surface = wgpu::glfw::CreateSurfaceForWindow(instance, window);
 #endif // __EMSCRIPTEN__
 
-    InitGraphics();
+    initGraphics();
 
 #if defined(__EMSCRIPTEN__)
     emscripten_set_main_loop(Render, 0, false);
@@ -479,6 +285,9 @@ void Start()
 #endif
 }
 
+/*
+**
+*/
 int main() 
 {
     wgpu::InstanceDescriptor desc = {};
@@ -502,7 +311,17 @@ int main()
     );
     instance.WaitAny(future, UINT64_MAX);
 
+    // be able to set user given labels for objects
+    char const* aszToggleNames[] =
+    {
+        "use_user_defined_labels_in_backend"
+    };
+    wgpu::DawnTogglesDescriptor toggleDesc = {};
+    toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;
+    toggleDesc.enabledToggleCount = 1;
     wgpu::DeviceDescriptor deviceDesc = {};
+    deviceDesc.nextInChain = &toggleDesc;
+
     deviceDesc.SetUncapturedErrorCallback(
         [](wgpu::Device const& device,
             wgpu::ErrorType errorType,
@@ -533,7 +352,5 @@ int main()
 
     instance.WaitAny(future2, UINT64_MAX);
 
-    Start();
-
-    
+    start();
 }
