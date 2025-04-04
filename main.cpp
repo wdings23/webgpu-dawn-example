@@ -35,6 +35,22 @@ float3          gCameraPosition;
 float3          gCameraUp;
 float           gfSpeed;
 
+uint32_t        giLeftButtonHeld;
+
+int32_t         giLastX = -1;
+int32_t         giLastY = -1;
+
+#define PI 3.14159f
+float2 gCameraAngle(0.0f, 0.0f);
+float3 gInitialCameraPosition(0.0f, 0.0f, 1.5f);
+float3 gInitialCameraLookAt(0.0f, 0.0f, -100.0f);
+
+void handleCameraMouseRotate(
+    int32_t iX,
+    int32_t iY,
+    int32_t iLastX,
+    int32_t iLastY);
+
 /*
 **
 */
@@ -179,8 +195,6 @@ void createRenderPipeline()
     pipeline = device.CreateRenderPipeline(&renderPipelineDesc);
 }
 
-
-
 /*
 **
 */
@@ -270,8 +284,8 @@ void start()
         return;
     }
 
-    gCameraLookAt = float3(0.0f, 0.0f, -100.0f);
-    gCameraPosition = float3(0.0f, 0.0f, 1.5f);
+    gCameraLookAt = gInitialCameraLookAt;
+    gCameraPosition = gInitialCameraPosition;
     gCameraUp = float3(0.0f, 1.0f, 0.0f);
     gfSpeed = 0.01f;
 
@@ -335,7 +349,50 @@ void start()
         }
     };
 
+    auto mouseButtonCallback = [](GLFWwindow* window, int button, int action, int mods)
+    {
+        if(button == GLFW_MOUSE_BUTTON_LEFT)
+        {
+            if(action == GLFW_PRESS)
+            {
+                giLeftButtonHeld = 1;
+            }
+            else
+            {
+                giLeftButtonHeld = 0;
+            }
+            
+        }
+    };
+
+    auto mouseMove = [](GLFWwindow* window, double xpos, double ypos)
+    {
+        if(giLeftButtonHeld)
+        {
+            if(giLastX == -1)
+            {
+                giLastX = (int32_t)xpos;
+            }
+
+            if(giLastY == -1)
+            {
+                giLastY = (int32_t)ypos;
+            }
+
+            handleCameraMouseRotate((int32_t)xpos, (int32_t)ypos, giLastX, giLastY);
+            giLastX = (int32_t)xpos;
+            giLastY = (int32_t)ypos;
+        }
+        else
+        {
+            giLastX = giLastY = -1;
+        }
+    };
+
     glfwSetKeyCallback(window, keyCallBack);
+
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetCursorPosCallback(window, mouseMove);
 
 #endif // __EMSCRIPTEN__
 
@@ -443,4 +500,70 @@ int main()
     instance.WaitAny(future2, UINT64_MAX);
 
     start();
+}
+
+
+
+/*
+**
+*/
+void handleCameraMouseRotate(
+    int32_t iX,
+    int32_t iY,
+    int32_t iLastX,
+    int32_t iLastY)
+{
+    if(giLastX < 0)
+    {
+        giLastX = iX;
+    }
+
+    if(giLastY < 0)
+    {
+        giLastY = iY;
+    }
+
+    float fDiffX = float(iX - giLastX) * -1.0f;
+    float fDiffY = float(iY - giLastY);
+
+    float fRotationSpeed = 0.3f;
+    float fDeltaX = (2.0f * 3.14159f) / 512.0f;
+    float fDeltaY = (2.0f * 3.14159f) / 512.0f;
+
+    gCameraAngle.y += fDiffX * fRotationSpeed * fDeltaY;
+    gCameraAngle.x += fDiffY * fRotationSpeed * fDeltaX;
+
+    if(gCameraAngle.y < 0.0f)
+    {
+        gCameraAngle.y = 2.0f * 3.14159f + gCameraAngle.y;
+    }
+    if(gCameraAngle.y > 2.0f * 3.14159f)
+    {
+        gCameraAngle.y = gCameraAngle.y - 2.0f * 3.14159f;
+    }
+
+    if(gCameraAngle.x < -PI * 0.5f)
+    {
+        gCameraAngle.x = -PI * 0.5f;
+    }
+    if(gCameraAngle.x > PI * 0.5f)
+    {
+        gCameraAngle.x = PI * 0.5f;
+    }
+
+
+    float4x4 rotateX = rotateMatrixX(gCameraAngle.x);
+    float4x4 rotateY = rotateMatrixY(gCameraAngle.y);
+    float4x4 totalMatrix = rotateY * rotateX;
+
+    float3 diff = gInitialCameraPosition - gInitialCameraLookAt;
+
+    float4 xformEyePosition = totalMatrix * float4(diff, 1.0f);
+    xformEyePosition.x += gCameraLookAt.x;
+    xformEyePosition.y += gCameraLookAt.y;
+    xformEyePosition.z += gCameraLookAt.z;
+    gCameraPosition = xformEyePosition;
+
+    giLastX = iX;
+    giLastY = iY;
 }

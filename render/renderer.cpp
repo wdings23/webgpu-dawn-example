@@ -295,7 +295,7 @@ namespace Render
                     renderPassEncoder.MultiDrawIndexedIndirect(
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
                         0,
-                        65536 * 2,
+                        (uint32_t)maMeshExtents.size(), //65536 * 2,
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Num Draw Calls"],
                         0
                     );
