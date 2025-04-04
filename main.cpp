@@ -13,6 +13,8 @@
 
 #include <utils/LogPrint.h>
 
+#define PI 3.14159f
+
 wgpu::Instance instance;
 wgpu::Adapter adapter;
 wgpu::Device device;
@@ -36,16 +38,25 @@ float3          gCameraUp;
 float           gfSpeed;
 
 uint32_t        giLeftButtonHeld;
+uint32_t        giRightButtonHeld;
 
 int32_t         giLastX = -1;
 int32_t         giLastY = -1;
+float           gfRotationSpeed = 0.03f;
 
-#define PI 3.14159f
+
+
 float2 gCameraAngle(0.0f, 0.0f);
-float3 gInitialCameraPosition(0.0f, 0.0f, 1.5f);
+float3 gInitialCameraPosition(0.0f, 0.0f, 3.0f);
 float3 gInitialCameraLookAt(0.0f, 0.0f, -100.0f);
 
 void handleCameraMouseRotate(
+    int32_t iX,
+    int32_t iY,
+    int32_t iLastX,
+    int32_t iLastY);
+
+void handleCameraMousePan(
     int32_t iX,
     int32_t iY,
     int32_t iLastX,
@@ -203,7 +214,7 @@ void render()
     CameraUpdateInfo cameraInfo = {};
     cameraInfo.mfFar = 100.0f;
     cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
-    cameraInfo.mfNear = 0.3f;
+    cameraInfo.mfNear = 0.1f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
@@ -288,6 +299,7 @@ void start()
     gCameraPosition = gInitialCameraPosition;
     gCameraUp = float3(0.0f, 1.0f, 0.0f);
     gfSpeed = 0.01f;
+    giLeftButtonHeld = giRightButtonHeld = 0;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window =
@@ -361,7 +373,17 @@ void start()
             {
                 giLeftButtonHeld = 0;
             }
-            
+        }
+        else if(button == GLFW_MOUSE_BUTTON_RIGHT)
+        {
+            if(action == GLFW_PRESS)
+            {
+                giRightButtonHeld = 1;
+            }
+            else
+            {
+                giRightButtonHeld = 0;
+            }
         }
     };
 
@@ -380,6 +402,22 @@ void start()
             }
 
             handleCameraMouseRotate((int32_t)xpos, (int32_t)ypos, giLastX, giLastY);
+            giLastX = (int32_t)xpos;
+            giLastY = (int32_t)ypos;
+        }
+        else if(giRightButtonHeld)
+        {
+            if(giLastX == -1)
+            {
+                giLastX = (int32_t)xpos;
+            }
+
+            if(giLastY == -1)
+            {
+                giLastY = (int32_t)ypos;
+            }
+
+            handleCameraMousePan((int32_t)xpos, (int32_t)ypos, giLastX, giLastY);
             giLastX = (int32_t)xpos;
             giLastY = (int32_t)ypos;
         }
@@ -526,12 +564,11 @@ void handleCameraMouseRotate(
     float fDiffX = float(iX - giLastX) * -1.0f;
     float fDiffY = float(iY - giLastY);
 
-    float fRotationSpeed = 0.3f;
     float fDeltaX = (2.0f * 3.14159f) / 512.0f;
     float fDeltaY = (2.0f * 3.14159f) / 512.0f;
 
-    gCameraAngle.y += fDiffX * fRotationSpeed * fDeltaY;
-    gCameraAngle.x += fDiffY * fRotationSpeed * fDeltaX;
+    gCameraAngle.y += fDiffX * gfRotationSpeed * fDeltaY;
+    gCameraAngle.x += fDiffY * gfRotationSpeed * fDeltaX;
 
     if(gCameraAngle.y < 0.0f)
     {
@@ -566,4 +603,28 @@ void handleCameraMouseRotate(
 
     giLastX = iX;
     giLastY = iY;
+}
+
+/*
+**
+*/
+void handleCameraMousePan(
+    int32_t iX,
+    int32_t iY,
+    int32_t iLastX,
+    int32_t iLastY)
+{
+    float const fSpeed = 0.01f;
+
+    float fDiffX = float(iX - iLastX);
+    float fDiffY = float(iY - iLastY);
+
+    float3 viewDir = gCameraLookAt - gCameraPosition;
+    float3 normalizedViewDir = normalize(viewDir);
+
+    float3 tangent = cross(gCameraUp, normalizedViewDir);
+    float3 binormal = cross(tangent, normalizedViewDir);
+
+    gCameraPosition = gCameraPosition + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
+    gCameraLookAt = gCameraLookAt + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
 }
