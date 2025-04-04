@@ -295,8 +295,13 @@ int main()
     desc.capabilities.timedWaitAnyEnable = true;
     instance = wgpu::CreateInstance(&desc);
 
+    wgpu::RequestAdapterOptions adapterOptions = {};
+    adapterOptions.backendType = wgpu::BackendType::Vulkan;
+    //adapterOptions.featureLevel = wgpu::FeatureLevel::Compatibility;
+    //adapterOptions.forceFallbackAdapter = true;
+    //adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
     wgpu::Future future = instance.RequestAdapter(
-        nullptr,
+        &adapterOptions,
         wgpu::CallbackMode::WaitAnyOnly,
         [](wgpu::RequestAdapterStatus status,
             wgpu::Adapter a,
@@ -304,6 +309,9 @@ int main()
         {
             if(status != wgpu::RequestAdapterStatus::Success)
             {
+                DEBUG_PRINTF("!!! error %d requesting adapter -- message: \"%s\"\n",
+                    status,
+                    message.data);
                 assert(0);
             }
 
@@ -331,7 +339,7 @@ int main()
     deviceDesc.nextInChain = &toggleDesc;
     deviceDesc.requiredFeatures = aFeatureNames;
     deviceDesc.requiredFeatureCount = sizeof(aFeatureNames) / sizeof(*aFeatureNames);
-
+    
     deviceDesc.SetUncapturedErrorCallback(
         [](wgpu::Device const& device,
             wgpu::ErrorType errorType,
