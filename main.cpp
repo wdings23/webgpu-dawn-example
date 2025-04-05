@@ -66,6 +66,8 @@ float2 gCameraAngle(0.0f, 0.0f);
 float3 gInitialCameraPosition(0.0f, 0.0f, -3.0f);
 float3 gInitialCameraLookAt(0.0f, 0.0f, 0.0f);
 
+std::vector<int32_t> aiHiddenMeshes;
+
 void handleCameraMouseRotate(
     int32_t iX,
     int32_t iY,
@@ -333,6 +335,7 @@ void start()
         {
             case GLFW_KEY_W:
             {
+                // move forward
                 float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
                 gCameraPosition += viewDir * gfSpeed;
                 gCameraLookAt += viewDir * gfSpeed;
@@ -342,6 +345,7 @@ void start()
 
             case GLFW_KEY_S:
             {
+                // move back
                 float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
                 gCameraPosition += viewDir * -gfSpeed;
                 gCameraLookAt += viewDir * -gfSpeed;
@@ -351,6 +355,7 @@ void start()
 
             case GLFW_KEY_A:
             {
+                // pan left
                 float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
                 float3 tangent = cross(gCameraUp, viewDir);
                 float3 binormal = cross(viewDir, tangent);
@@ -363,6 +368,7 @@ void start()
 
             case GLFW_KEY_D:
             {
+                // pan right
                 float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
                 float3 tangent = cross(gCameraUp, viewDir);
                 float3 binormal = cross(viewDir, tangent);
@@ -375,6 +381,7 @@ void start()
 
             case GLFW_KEY_E:
             {
+                // explode mesh 
                 gfExplodeMultiplier += 1.0f;
                 gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
 
@@ -383,6 +390,7 @@ void start()
 
             case GLFW_KEY_R:
             {
+                // move meshes back from explosion
                 gfExplodeMultiplier -= 1.0f;
                 gfExplodeMultiplier = std::max(gfExplodeMultiplier, 1.0f);
 
@@ -393,6 +401,7 @@ void start()
 
             case GLFW_KEY_H:
             {
+                // hide mesh
                 uint32_t iFlag = 1;
                 Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
                 if(selectionInfo.miMeshID >= 0)
@@ -403,6 +412,29 @@ void start()
                         (int32_t(selectionInfo.miMeshID) - 2) * sizeof(uint32_t),
                         sizeof(uint32_t)
                     );
+
+                    aiHiddenMeshes.push_back(selectionInfo.miMeshID - 2);
+                }
+                break;
+            }
+
+            case GLFW_KEY_J:
+            {
+                // show last hidden mesh
+                uint32_t iFlag = 0;
+                Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
+                if(aiHiddenMeshes.size() > 0)
+                {
+                    int32_t iMesh = aiHiddenMeshes.back();
+                    gRenderer.setBufferData(
+                        "visibilityFlags",
+                        &iFlag,
+                        iMesh * sizeof(uint32_t),
+                        sizeof(uint32_t)
+                    );
+
+                    aiHiddenMeshes.pop_back();
+                    
                 }
                 break;
             }
