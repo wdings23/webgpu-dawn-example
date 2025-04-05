@@ -642,7 +642,7 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
-        wgpu::Texture& swapChainTexture = maRenderJobs["Deferred Indirect Graphics"]->mOutputImageAttachments["Clip Space Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
 
         return swapChainTexture;
     }

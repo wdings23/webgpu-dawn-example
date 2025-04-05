@@ -466,7 +466,7 @@ namespace Render
             if(attachmentType == "TextureInput")
             {
                 bindingLayout.texture.multisampled = false;
-                bindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
+                bindingLayout.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
                 bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
                 bindingLayout.visibility = wgpu::ShaderStage::Fragment;
 
