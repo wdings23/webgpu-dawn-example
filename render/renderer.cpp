@@ -110,20 +110,25 @@ namespace Render
         uint32_t iVertexSize = *piData++;
         uint32_t iTriangleStartOffset = *piData++;
 
+        // triangle ranges for all the meshes
         maMeshTriangleRanges.resize(iNumMeshes);
         memcpy(maMeshTriangleRanges.data(), piData, sizeof(MeshTriangleRange) * iNumMeshes);
         piData += (2 * iNumMeshes);
 
+        // the total mesh extent is at the very end of the list
         MeshExtent const* pMeshExtent = (MeshExtent const*)piData;
-        maMeshExtents.resize(iNumMeshes);
-        memcpy(maMeshExtents.data(), pMeshExtent, sizeof(MeshExtent) * iNumMeshes);
-        pMeshExtent += iNumMeshes;
+        maMeshExtents.resize(iNumMeshes + 1);
+        memcpy(maMeshExtents.data(), pMeshExtent, sizeof(MeshExtent) * (iNumMeshes + 1));
+        pMeshExtent += (iNumMeshes + 1);
+        MeshExtent const& totalMeshExtent = maMeshExtents.back();
 
+        // all the mesh vertices
         std::vector<Vertex> aTotalMeshVertices(iNumTotalVertices);
         Vertex const* pVertices = (Vertex const*)pMeshExtent;
         memcpy(aTotalMeshVertices.data(), pVertices, iNumTotalVertices * sizeof(Vertex));
         pVertices += iNumTotalVertices;
 
+        // all the triangle indices
         std::vector<uint32_t> aiTotalMeshTriangleIndices(iNumTotalTriangles * 3);
         piData = (uint32_t const*)pVertices;
         memcpy(aiTotalMeshTriangleIndices.data(), piData, iNumTotalTriangles * 3 * sizeof(uint32_t));
@@ -155,6 +160,7 @@ namespace Render
         device.GetQueue().WriteBuffer(maBuffers["train-mesh-triangle-ranges"], 0, maMeshTriangleRanges.data(), maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
         device.GetQueue().WriteBuffer(maBuffers["train-mesh-extents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
 
+        // default uniform buffer
         bufferDesc.size = sizeof(DefaultUniformData);
         bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         maBuffers["default-uniform-buffer"] = device.CreateBuffer(&bufferDesc);
@@ -186,12 +192,12 @@ namespace Render
         mpSampler = desc.mpSampler;
         createRenderJobs(desc);
 
+        // write to buffers (triangle indices, mesh extent, default uniform buffer, and materials)
         device.GetQueue().WriteBuffer(
             maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["aMeshTriangleIndexRanges"],
             0,
             maMeshTriangleRanges.data(),
             maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
-
         device.GetQueue().WriteBuffer(
             maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["aMeshBBox"],
             0,
@@ -294,7 +300,7 @@ namespace Render
             };
 
             UniformData uniformBuffer;
-            uniformBuffer.miNumMeshes = (uint32_t)maMeshExtents.size();
+            uniformBuffer.miNumMeshes = (uint32_t)maMeshTriangleRanges.size();
             uniformBuffer.mfExplodeMultiplier = mfExplosionMult;
 
             mpDevice->GetQueue().WriteBuffer(
@@ -399,7 +405,7 @@ namespace Render
                     renderPassEncoder.MultiDrawIndexedIndirect(
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
                         0,
-                        (uint32_t)maMeshExtents.size(), //65536 * 2,
+                        (uint32_t)maMeshTriangleRanges.size(), //65536 * 2,
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Num Draw Calls"],
                         0
                     );
