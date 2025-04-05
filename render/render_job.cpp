@@ -135,7 +135,7 @@ namespace Render
             if(shaderResourceType == "buffer")
             {
                 uint32_t iSize = 0;
-                if(shaderResource.HasMember("size"))
+                if(shaderResource.HasMember("size") || shaderResource.HasMember("external") == false)
                 {
                     iSize = shaderResource["size"].GetUint();
 
@@ -156,7 +156,13 @@ namespace Render
                     {
                         bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
                     }
+                    
                     mUniformBuffers[shaderResourceName] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
+                }
+                else
+                {
+                    uint32_t iBufferSize = 0;
+                    mUniformBuffers[shaderResourceName] = createInfo.mpfnGetBuffer(iBufferSize, shaderResourceName, createInfo.mpUserData);
                 }
             }
 

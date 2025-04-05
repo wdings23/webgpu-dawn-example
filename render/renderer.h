@@ -34,6 +34,15 @@ namespace Render
             float3 const* mpCameraLookAt;
         };
 
+        struct SelectMeshInfo
+        {
+            int32_t miMeshID = -1;
+            int32_t miSelectionCoordX;
+            int32_t miSelectionCoordY;
+            float3 mMinPosition;
+            float3 mMaxPosition;
+        };
+
     public:
         CRenderer() = default;
         virtual ~CRenderer() = default;
@@ -58,6 +67,8 @@ namespace Render
             mbUpdateUniform = true;
         }
 
+        SelectMeshInfo const& getSelectionInfo();
+
     protected:
         void createRenderJobs(CreateDescriptor& desc);
 
@@ -68,6 +79,7 @@ namespace Render
 
         // TODO: move buffers output renderer
         std::map<std::string, wgpu::Buffer>     maBuffers;
+        std::map<std::string, uint32_t>         maBufferSizes;
         std::map<std::string, std::unique_ptr<Render::CRenderJob>>   maRenderJobs;
         std::vector<std::string> maOrderedRenderJobs;
 
@@ -98,12 +110,7 @@ namespace Render
         int2                                    mSelectedCoord = int2(-1, -1);
         wgpu::Buffer                            mOutputImageBuffer;
         
-        struct SelectMeshInfo
-        {
-            int32_t miMeshID;
-            int32_t miSelectionCoordX;
-            int32_t miSelectionCoordY;
-        };
+        
         SelectMeshInfo                          mSelectMeshInfo;
         
         float                                   mfExplosionMult = 1.0f;

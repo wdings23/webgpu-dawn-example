@@ -35,6 +35,9 @@ namespace Render
 			Render::PassType										mPassType;
 
 			wgpu::Sampler*											mpSampler;
+
+			wgpu::Buffer(*mpfnGetBuffer)(uint32_t& iBufferSize, std::string const& bufferName, void* pUserData);
+			void* mpUserData = nullptr;
 		};
 	public:
 		CRenderJob() = default;

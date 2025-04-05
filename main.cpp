@@ -34,6 +34,12 @@ struct UniformData
     int32_t miSelectedMesh;
 };
 
+enum State
+{
+    NORMAL = 0,
+    ZOOM_TO_SELECTION,
+};
+
 CCamera gCamera;
 Render::CRenderer gRenderer;
 wgpu::Sampler gSampler;
@@ -54,6 +60,7 @@ int32_t         giLastY = -1;
 float           gfRotationSpeed = 0.3f;
 float           gfExplodeMultiplier = 1.0f;
 
+State           gState;
 
 float2 gCameraAngle(0.0f, 0.0f);
 float3 gInitialCameraPosition(0.0f, 0.0f, -3.0f);
@@ -312,6 +319,8 @@ void start()
     gfSpeed = 0.1f;
     giLeftButtonHeld = giRightButtonHeld = 0;
 
+    gState = NORMAL;
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window =
         glfwCreateWindow(kWidth, kHeight, "WebGPU window", nullptr, nullptr);
@@ -372,12 +381,29 @@ void start()
                 break;
             }
 
-            case GLFW_KEY_Z:
+            case GLFW_KEY_R:
             {
                 gfExplodeMultiplier -= 1.0f;
                 gfExplodeMultiplier = std::max(gfExplodeMultiplier, 1.0f);
 
                 gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
+
+                break;
+            }
+
+            case GLFW_KEY_Z:
+            {
+                gState = ZOOM_TO_SELECTION;
+                Render::CRenderer::SelectMeshInfo const& selectMeshInfo = gRenderer.getSelectionInfo();
+                if(selectMeshInfo.miMeshID >= 0)
+                {
+                    float3 midPt = (selectMeshInfo.mMaxPosition + selectMeshInfo.mMinPosition) * 0.5f;
+                    float3 diff = selectMeshInfo.mMaxPosition - selectMeshInfo.mMinPosition;
+                    float fRadius = length(diff) * 0.5f;
+                    
+                    gCameraPosition = midPt + float3(0.0f, 0.0f, 1.0f) * fRadius;
+                    gCameraLookAt = midPt;
+                }
 
                 break;
             }
@@ -528,6 +554,7 @@ int main()
     };
     wgpu::Limits requireLimits = {};
     requireLimits.maxBufferSize = 1000000000;
+    requireLimits.maxStorageBufferBindingSize = 1000000000;
 
     wgpu::DawnTogglesDescriptor toggleDesc = {};
     toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;

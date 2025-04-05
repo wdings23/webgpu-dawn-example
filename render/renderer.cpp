@@ -139,32 +139,71 @@ namespace Render
         bufferDesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         maBuffers["train-vertex-buffer"] = device.CreateBuffer(&bufferDesc);
         maBuffers["train-vertex-buffer"].SetLabel("Train Vertex Buffer");
+        maBufferSizes["train-vertex-buffer"] = (uint32_t)bufferDesc.size;
 
         bufferDesc.size = aiTotalMeshTriangleIndices.size() * sizeof(uint32_t);
         bufferDesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         maBuffers["train-index-buffer"] = device.CreateBuffer(&bufferDesc);
         maBuffers["train-index-buffer"].SetLabel("Train Index Buffer");
+        maBufferSizes["train-index-buffer"] = (uint32_t)bufferDesc.size;
 
         bufferDesc.size = iNumTotalVertices * sizeof(Vertex);
         bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["train-mesh-triangle-ranges"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["train-mesh-triangle-ranges"].SetLabel("Train Mesh Triangle Ranges");
+        maBuffers["meshTriangleIndexRanges"] = device.CreateBuffer(&bufferDesc);
+        maBuffers["meshTriangleIndexRanges"].SetLabel("Mesh Triangle Ranges");
+        maBufferSizes["meshTriangleIndexRanges"] = (uint32_t)bufferDesc.size;
 
         bufferDesc.size = iNumTotalVertices * sizeof(MeshExtent);
         bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["train-mesh-extents"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["train-mesh-extents"].SetLabel("Train Mesh Extents");
+        maBuffers["meshExtents"] = device.CreateBuffer(&bufferDesc);
+        maBuffers["meshExtents"].SetLabel("Train Mesh Extents");
+        maBufferSizes["meshExtents"] = (uint32_t)bufferDesc.size;
 
         device.GetQueue().WriteBuffer(maBuffers["train-vertex-buffer"], 0, aTotalMeshVertices.data(), iNumTotalVertices * sizeof(Vertex));
         device.GetQueue().WriteBuffer(maBuffers["train-index-buffer"], 0, aiTotalMeshTriangleIndices.data(), aiTotalMeshTriangleIndices.size() * sizeof(uint32_t));
-        device.GetQueue().WriteBuffer(maBuffers["train-mesh-triangle-ranges"], 0, maMeshTriangleRanges.data(), maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
-        device.GetQueue().WriteBuffer(maBuffers["train-mesh-extents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
+        device.GetQueue().WriteBuffer(maBuffers["meshTriangleIndexRanges"], 0, maMeshTriangleRanges.data(), maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
+        device.GetQueue().WriteBuffer(maBuffers["meshExtents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
+
+        {
+            std::vector<char> acMaterialID;
+            Loader::loadFile(acMaterialID, desc.mMeshFilePath + ".mid");
+
+            bufferDesc.size = acMaterialID.size();
+            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+            maBuffers["meshMaterialIDs"] = device.CreateBuffer(&bufferDesc);
+            maBuffers["meshMaterialIDs"].SetLabel("Mesh Material IDs");
+            maBufferSizes["meshEmeshMaterialIDsxtents"] = (uint32_t)bufferDesc.size;
+
+            device.GetQueue().WriteBuffer(
+                maBuffers["meshMaterialIDs"],
+                0,
+                acMaterialID.data(),
+                acMaterialID.size());
+        }
+
+        {
+            std::vector<char> acMaterials;
+            Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");
+
+            bufferDesc.size = acMaterials.size();
+            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+            maBuffers["meshMaterials"] = device.CreateBuffer(&bufferDesc);
+            maBuffers["meshMaterials"].SetLabel("Mesh Materials");
+            maBufferSizes["meshMaterials"] = (uint32_t)bufferDesc.size;
+
+            device.GetQueue().WriteBuffer(
+                maBuffers["meshMaterials"],
+                0,
+                acMaterials.data(),
+                acMaterials.size());
+        }
 
         // default uniform buffer
         bufferDesc.size = sizeof(DefaultUniformData);
         bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         maBuffers["default-uniform-buffer"] = device.CreateBuffer(&bufferDesc);
         maBuffers["default-uniform-buffer"].SetLabel("Default Uniform Buffer");
+        maBufferSizes["default-uniform-buffer"] = (uint32_t)bufferDesc.size;
 
         // full screen triangle
         Vertex aFullScreenTriangles[3];
@@ -183,6 +222,7 @@ namespace Render
         bufferDesc.size = sizeof(Vertex) * 3;
         maBuffers["full-screen-triangle"] = device.CreateBuffer(&bufferDesc);
         maBuffers["full-screen-triangle"].SetLabel("Full Screen Triangle Buffer");
+        maBufferSizes["full-screen-triangle"] = (uint32_t)bufferDesc.size;
         device.GetQueue().WriteBuffer(
             maBuffers["full-screen-triangle"], 
             0, 
@@ -190,8 +230,10 @@ namespace Render
             3 * sizeof(Vertex));
 
         mpSampler = desc.mpSampler;
+        
         createRenderJobs(desc);
 
+#if 0
         // write to buffers (triangle indices, mesh extent, default uniform buffer, and materials)
         device.GetQueue().WriteBuffer(
             maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["aMeshTriangleIndexRanges"],
@@ -203,6 +245,7 @@ namespace Render
             0,
             maMeshExtents.data(),
             maMeshExtents.size() * sizeof(MeshExtent));
+#endif // #if 0
 
         struct UniformData
         {
@@ -219,26 +262,8 @@ namespace Render
             &uniformData,
             sizeof(UniformData));
 
-        {
-            std::vector<char> acMaterialID;
-            Loader::loadFile(acMaterialID, desc.mMeshFilePath + ".mid");
-            device.GetQueue().WriteBuffer(
-                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["meshMaterialIDs"],
-                0,
-                acMaterialID.data(),
-                acMaterialID.size());
-        }
-
-        {
-            std::vector<char> acMaterials;
-            Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");
-            device.GetQueue().WriteBuffer(
-                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["materials"],
-                0,
-                acMaterials.data(),
-                acMaterials.size());
-        }
-
+        
+#if 0
         {
             device.GetQueue().WriteBuffer(
                 maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["meshExtents"],
@@ -246,6 +271,7 @@ namespace Render
                 maMeshExtents.data(),
                 maMeshExtents.size() * sizeof(MeshExtent));
         }
+#endif // #if 0
 
         mpInstance = desc.mpInstance;
     }
@@ -549,6 +575,16 @@ namespace Render
         Render::CRenderJob::CreateInfo createInfo = {};
         createInfo.miScreenWidth = desc.miScreenWidth;
         createInfo.miScreenHeight = desc.miScreenHeight;
+        createInfo.mpfnGetBuffer = [](uint32_t& iBufferSize, std::string const& bufferName, void* pUserData)
+        {
+            Render::CRenderer* pRenderer = (Render::CRenderer*)pUserData;
+            assert(pRenderer->maBuffers.find(bufferName) != pRenderer->maBuffers.end());
+            
+            iBufferSize = pRenderer->maBufferSizes[bufferName];
+            return pRenderer->maBuffers[bufferName];
+        };
+        createInfo.mpUserData = this;
+
         rapidjson::Document doc;
         {
             doc.Parse(acFileContentBuffer.data());
@@ -693,6 +729,7 @@ namespace Render
         mCaptureUniformBufferName = "selectedMesh";
 
         mSelectedCoord = int2(iX, iY);
+        mSelectMeshInfo.miMeshID = 0;
 
         if(mOutputImageBuffer.Get() == nullptr)
         {
@@ -701,6 +738,20 @@ namespace Render
             desc.size = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
             mOutputImageBuffer = mpDevice->CreateBuffer(&desc);
         }
+    }
+
+    /*
+    **
+    */
+    Render::CRenderer::SelectMeshInfo const& CRenderer::getSelectionInfo()
+    {
+        if(mSelectMeshInfo.miMeshID >= 0)
+        {
+            mSelectMeshInfo.mMinPosition = maMeshExtents[mSelectMeshInfo.miMeshID].mMinPosition;
+            mSelectMeshInfo.mMaxPosition = maMeshExtents[mSelectMeshInfo.miMeshID].mMaxPosition;
+        }
+
+        return mSelectMeshInfo;
     }
 
 }   // Render
