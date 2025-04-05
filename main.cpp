@@ -1,6 +1,5 @@
 #include <GLFW/glfw3.h>
 #include <webgpu/webgpu_cpp.h>
-#include <webgpu/webgpu_cpp_print.h>
 #include <iostream>
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
@@ -305,7 +304,8 @@ void initGraphics()
 void start() 
 {
 #if defined(__EMSCRIPTEN__)
-    wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc{};
+    wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
+    canvasDesc.selector = "#canvas";
     wgpu::SurfaceDescriptor surfaceDesc{.nextInChain = &canvasDesc};
     surface = instance.CreateSurface(&surfaceDesc);
 #else
@@ -557,7 +557,7 @@ void start()
     initGraphics();
 
 #if defined(__EMSCRIPTEN__)
-    emscripten_set_main_loop(Render, 0, false);
+    emscripten_set_main_loop(render, 0, false);
 #else
     while(!glfwWindowShouldClose(window)) 
     {
@@ -569,18 +569,74 @@ void start()
 #endif
 }
 
+#if defined(__EMSCRIPTEN__)
+void GetAdapter(void (*callback)(wgpu::Adapter)) {
+    instance.RequestAdapter(
+        nullptr,
+        // TODO(https://bugs.chromium.org/p/dawn/issues/detail?id=1892): Use
+        // wgpu::RequestAdapterStatus and wgpu::Adapter.
+        [](WGPURequestAdapterStatus status, WGPUAdapter cAdapter,
+            const char* message, void* userdata) {
+                if(message) {
+                    printf("RequestAdapter: %s\n", message);
+                }
+                if(status != WGPURequestAdapterStatus_Success) {
+                    exit(0);
+                }
+                wgpu::Adapter adapter = wgpu::Adapter::Acquire(cAdapter);
+                reinterpret_cast<void (*)(wgpu::Adapter)>(userdata)(adapter);
+        }, reinterpret_cast<void*>(callback));
+}
+
+void GetDevice(void (*callback)(wgpu::Device)) {
+    adapter.RequestDevice(
+        nullptr,
+        // TODO(https://bugs.chromium.org/p/dawn/issues/detail?id=1892): Use
+        // wgpu::RequestDeviceStatus and wgpu::Device.
+        [](WGPURequestDeviceStatus status, WGPUDevice cDevice,
+            const char* message, void* userdata) {
+                if(message) {
+                    printf("RequestDevice: %s\n", message);
+                }
+                wgpu::Device device = wgpu::Device::Acquire(cDevice);
+                device.SetUncapturedErrorCallback(
+                    [](WGPUErrorType type, const char* message, void* userdata) {
+                        std::cout << "Error: " << type << " - message: " << message;
+                    },
+                    nullptr);
+                reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
+        }, reinterpret_cast<void*>(callback));
+}
+
+#endif // __EMSCRIPTEN__
+
 /*
 **
 */
 int main() 
 {
+#if defined(__EMSCRIPTEN__)
+    instance = wgpu::CreateInstance();
+#else 
     wgpu::InstanceDescriptor desc = {};
     desc.capabilities.timedWaitAnyEnable = true;
     instance = wgpu::CreateInstance(&desc);
+#endif // __EMSCRIPTEN__
 
+#if defined(__EMSCRIPTEN__)
+    GetAdapter([](wgpu::Adapter a) {
+        adapter = a;
+        GetDevice([](wgpu::Device d) {
+            device = d;
+            start();
+            });
+        });
+
+#else
     wgpu::RequestAdapterOptions adapterOptions = {};
     adapterOptions.backendType = wgpu::BackendType::Vulkan;
     adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
+
     wgpu::Future future = instance.RequestAdapter(
         &adapterOptions,
         wgpu::CallbackMode::WaitAnyOnly,
@@ -658,6 +714,7 @@ int main()
     );
 
     instance.WaitAny(future2, UINT64_MAX);
+#endif // __EMSCRIPTEN__
 
     start();
 }

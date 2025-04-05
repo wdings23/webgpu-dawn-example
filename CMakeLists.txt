@@ -44,7 +44,14 @@ source_group("external" FILES ${EXTERNAL_DIR})
 
 if(EMSCRIPTEN)
   set_target_properties(app PROPERTIES SUFFIX ".html")
-  target_link_options(app PRIVATE "-sUSE_WEBGPU=1" "-sUSE_GLFW=3")
+  target_link_options(app PRIVATE 
+    "-sUSE_WEBGPU=1" 
+    "-sUSE_GLFW=3" 
+    "-sASYNCIFY" 
+    "-sMODULARIZE" 
+    "-sEXPORT_ES6=1" 
+    "-sENVIRONMENT='web'" 
+    "-sFETCH=1")
 else()
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
   set(DAWN_FETCH_DEPENDENCIES ON)

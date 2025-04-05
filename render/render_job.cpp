@@ -737,10 +737,19 @@ namespace Render
         }
         else if(mType == JobType::Compute)
         {
+#if defined(__EMSCRIPTEN__)
+            wgpu::ProgrammableStageDescriptor computeDesc = {};
+            computeDesc.module = shaderModule;
+            computeDesc.entryPoint = "cs_main";
+            computeDesc.constants = nullptr;
+            computeDesc.constantCount = 0;
+#else 
             wgpu::ComputeState computeDesc = {};
             computeDesc.module = shaderModule;
             computeDesc.entryPoint = "cs_main";
             computeDesc.constants = nullptr;
+            computeDesc.constantCount = 0;
+#endif // __EMSCRIPTEN__
 
             wgpu::ComputePipelineDescriptor pipelineDescriptor = {};
             pipelineDescriptor.compute = computeDesc;

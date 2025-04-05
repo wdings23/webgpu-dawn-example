@@ -1,6 +1,10 @@
 #include <loader/loader.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/fetch.h>
+#else
 #include <curl/curl.h>
+#endif // __EMSCRIPTEN__
 
 namespace Loader
 {
@@ -17,6 +21,30 @@ namespace Loader
         return iTotalSize;
     }
 
+#if defined(__EMSCRIPTEN__)
+    /*
+    **
+    */
+    void downloadSucceeded(emscripten_fetch_t* fetch)
+    {
+        std::vector<char>& acFileContentBuffer = *((std::vector<char>*)fetch->userData);
+
+        acFileContentBuffer.resize(fetch->numBytes);
+        memcpy(acFileContentBuffer.data(), fetch->data, fetch->numBytes);
+        emscripten_fetch_close(fetch);
+    }
+
+    /*
+    **
+    */
+    void downloadFailed(emscripten_fetch_t* fetch)
+    {
+        printf("!!! error fetching data !!!\n");
+        emscripten_fetch_close(fetch);
+    }
+
+#endif // __EMSCRIPTEN__
+
     /*
     **
     */
@@ -25,10 +53,23 @@ namespace Loader
         std::string const& filePath,
         bool bTextFile)
     {
+        std::string url = "http://127.0.0.1:8080/" + filePath;
+
+#if defined(__EMSCRIPTEN__)
+        emscripten_fetch_attr_t attr;
+        emscripten_fetch_attr_init(&attr);
+        strcpy(attr.requestMethod, "GET");
+        attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY; // Load response into memory
+        attr.onsuccess = downloadSucceeded;
+        attr.onerror = downloadFailed;
+        attr.userData = &acFileContentBuffer;
+
+        emscripten_fetch(&attr, url.c_str());
+#else 
         CURL* curl;
         CURLcode res;
 
-        std::string url = "http://127.0.0.1:8080/" + filePath;
+        
         curl = curl_easy_init();
         if(curl)
         {
@@ -44,5 +85,6 @@ namespace Loader
         {
             acFileContentBuffer.push_back(0);
         }
+#endif // __EMSCRIPTEN__
     }
 }

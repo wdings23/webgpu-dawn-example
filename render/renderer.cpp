@@ -423,17 +423,18 @@ namespace Render
                 
                 if(pRenderJob->mPassType == Render::PassType::DrawMeshes)
                 {
-                    //for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
-                    //{
-                    //    uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
-                    //    uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
-                    //    //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
-                    //    renderPassEncoder.DrawIndexedIndirect(
-                    //        maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
-                    //        iMesh * 5 * sizeof(uint32_t)
-                    //    );
-                    //}
-
+#if defined(__EMSCRIPTEN__)
+                    for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
+                    {
+                        uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
+                        uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
+                        //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
+                        renderPassEncoder.DrawIndexedIndirect(
+                            maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
+                            iMesh * 5 * sizeof(uint32_t)
+                        );
+                    }
+#else
                     renderPassEncoder.MultiDrawIndexedIndirect(
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
                         0,
@@ -441,6 +442,7 @@ namespace Render
                         maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Num Draw Calls"],
                         0
                     );
+#endif // __EMSCRIPTEN__
                 }
                 else if(pRenderJob->mPassType == Render::PassType::FullTriangle)
                 {
@@ -505,6 +507,12 @@ namespace Render
         // mouse selection state, get the selected mesh from the shader
         if(mbWaitingForMeshSelection)
         {
+#if defined(__EMSCRIPTEN__)
+            SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange();
+            memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
+            mSelectMeshInfo.miMeshID -= 1;
+            mOutputImageBuffer.Unmap();
+#else
             auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
             {
                 if(status == wgpu::MapAsyncStatus::Success)
@@ -549,6 +557,7 @@ namespace Render
 
             assert(mpInstance);
             mpInstance->WaitAny(future, UINT64_MAX);
+#endif // __EMSCRIPTEN__
 
             // update uniform buffer, signalling selection is done
             if(miFrame - miStartCaptureFrame >= 3)
