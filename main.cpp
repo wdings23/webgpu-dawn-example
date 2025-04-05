@@ -58,7 +58,7 @@ uint32_t        giRightButtonHeld;
 int32_t         giLastX = -1;
 int32_t         giLastY = -1;
 float           gfRotationSpeed = 0.3f;
-float           gfExplodeMultiplier = 1.0f;
+float           gfExplodeMultiplier = 0.0f;
 
 State           gState;
 
@@ -391,22 +391,51 @@ void start()
                 break;
             }
 
+            case GLFW_KEY_H:
+            {
+                uint32_t iFlag = 1;
+                Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
+                if(selectionInfo.miMeshID >= 0)
+                {
+                    gRenderer.setBufferData(
+                        "visibilityFlags",
+                        &iFlag,
+                        (int32_t(selectionInfo.miMeshID) - 2) * sizeof(uint32_t),
+                        sizeof(uint32_t)
+                    );
+                }
+                break;
+            }
+
+#if 0
             case GLFW_KEY_Z:
             {
                 gState = ZOOM_TO_SELECTION;
                 Render::CRenderer::SelectMeshInfo const& selectMeshInfo = gRenderer.getSelectionInfo();
                 if(selectMeshInfo.miMeshID >= 0)
                 {
+                    float3 totalMidPt = (gRenderer.mTotalMeshExtent.mMaxPosition + gRenderer.mTotalMeshExtent.mMinPosition) * 0.5f;
                     float3 midPt = (selectMeshInfo.mMaxPosition + selectMeshInfo.mMinPosition) * 0.5f;
+                    
+                    float fZ = (totalMidPt.z - midPt.z) * std::max(gfExplodeMultiplier, 0.0f);
+                    midPt.z = midPt.z + fZ;
+
                     float3 diff = selectMeshInfo.mMaxPosition - selectMeshInfo.mMinPosition;
                     float fRadius = length(diff) * 0.5f;
-                    
-                    gCameraPosition = midPt + float3(0.0f, 0.0f, 1.0f) * fRadius;
+                    diff = midPt - gCameraPosition;
+                    float fLength = length(diff);
+                    float fPct = (fRadius * 1.25f) / fLength;
+
+                    gCameraPosition = midPt + normalize(diff) * fRadius;
                     gCameraLookAt = midPt;
+
+                    gInitialCameraPosition = gCameraPosition;
+                    gInitialCameraLookAt = gCameraLookAt;
                 }
 
                 break;
             }
+#endif // #if 0
         }
 
         float3 viewDir = normalize(gCameraLookAt - gCameraPosition);

@@ -39,8 +39,9 @@ namespace Render
             int32_t miMeshID = -1;
             int32_t miSelectionCoordX;
             int32_t miSelectionCoordY;
-            float3 mMinPosition;
-            float3 mMaxPosition;
+            int32_t miPadding;
+            float4 mMinPosition;
+            float4 mMaxPosition;
         };
 
     public:
@@ -59,6 +60,12 @@ namespace Render
             uint32_t iOffset,
             uint32_t iDataSize);
 
+        bool setBufferData(
+            std::string const& bufferName,
+            void* pData,
+            uint32_t iOffset,
+            uint32_t iDataSize);
+
         void highLightSelectedMesh(int32_t iX, int32_t iY);
 
         inline void setExplosionMultiplier(float fMult)
@@ -68,6 +75,15 @@ namespace Render
         }
 
         SelectMeshInfo const& getSelectionInfo();
+
+    public:
+        struct MeshExtent
+        {
+            float4  mMinPosition;
+            float4  mMaxPosition;
+        };
+
+        MeshExtent                              mTotalMeshExtent;
 
     protected:
         void createRenderJobs(CreateDescriptor& desc);
@@ -90,11 +106,7 @@ namespace Render
             uint32_t miStart;
             uint32_t miEnd;
         };
-        struct MeshExtent
-        {
-            float4  mMinPosition;
-            float4  mMaxPosition;
-        };
+        
 
         std::vector<MeshTriangleRange>          maMeshTriangleRanges;
         std::vector<MeshExtent>                 maMeshExtents;
@@ -102,6 +114,8 @@ namespace Render
         wgpu::Instance*                         mpInstance;
 
         wgpu::Sampler*                          mpSampler;
+
+        
 
     protected:
         std::string                             mCaptureImageName = "";
@@ -119,4 +133,5 @@ namespace Render
     
         uint32_t                                miStartCaptureFrame = 0;
     };
+
 }   // Render

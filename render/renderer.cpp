@@ -120,7 +120,7 @@ namespace Render
         maMeshExtents.resize(iNumMeshes + 1);
         memcpy(maMeshExtents.data(), pMeshExtent, sizeof(MeshExtent) * (iNumMeshes + 1));
         pMeshExtent += (iNumMeshes + 1);
-        MeshExtent const& totalMeshExtent = maMeshExtents.back();
+        mTotalMeshExtent = maMeshExtents.back();
 
         // all the mesh vertices
         std::vector<Vertex> aTotalMeshVertices(iNumTotalVertices);
@@ -153,7 +153,7 @@ namespace Render
         maBuffers["meshTriangleIndexRanges"].SetLabel("Mesh Triangle Ranges");
         maBufferSizes["meshTriangleIndexRanges"] = (uint32_t)bufferDesc.size;
 
-        bufferDesc.size = iNumTotalVertices * sizeof(MeshExtent);
+        bufferDesc.size = (iNumMeshes + 1) * sizeof(MeshExtent);
         bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         maBuffers["meshExtents"] = device.CreateBuffer(&bufferDesc);
         maBuffers["meshExtents"].SetLabel("Train Mesh Extents");
@@ -197,6 +197,12 @@ namespace Render
                 acMaterials.data(),
                 acMaterials.size());
         }
+
+        bufferDesc.size = iNumMeshes * sizeof(uint32_t);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["visibilityFlags"] = device.CreateBuffer(&bufferDesc);
+        maBuffers["visibilityFlags"].SetLabel("Mesh Visibility Flags");
+        maBufferSizes["visibilityFlags"] = (uint32_t)bufferDesc.size;
 
         // default uniform buffer
         bufferDesc.size = sizeof(DefaultUniformData);
@@ -519,10 +525,16 @@ namespace Render
                         mbWaitingForMeshSelection = false;
                     }
 
-                    DEBUG_PRINTF("!!! selected mesh: %d coordinate (%d, %d) !!!\n", 
+                    DEBUG_PRINTF("!!! selected mesh: %d coordinate (%d, %d) min (%.4f, %.4f, %.4f) max(%.4f, %.4f, %.4f) !!!\n", 
                         pInfo->miMeshID,
                         pInfo->miSelectionCoordX,
-                        pInfo->miSelectionCoordY);
+                        pInfo->miSelectionCoordY,
+                        pInfo->mMinPosition.x,
+                        pInfo->mMinPosition.y,
+                        pInfo->mMinPosition.z,
+                        pInfo->mMaxPosition.x,
+                        pInfo->mMaxPosition.y,
+                        pInfo->mMaxPosition.z);
                 }
             };
 
@@ -722,6 +734,28 @@ namespace Render
     /*
     **
     */
+    bool CRenderer::setBufferData(
+        std::string const& bufferName,
+        void* pData,
+        uint32_t iOffset,
+        uint32_t iDataSize)
+    {
+        bool bRet = true;
+
+        assert(maBuffers.find(bufferName) != maBuffers.end());
+        mpDevice->GetQueue().WriteBuffer(
+            maBuffers[bufferName],
+            iOffset,
+            pData,
+            iDataSize
+        );
+
+        return bRet;
+    }
+
+    /*
+    **
+    */
     void CRenderer::highLightSelectedMesh(int32_t iX, int32_t iY)
     {
         mCaptureImageName = "Selection Output";
@@ -745,12 +779,6 @@ namespace Render
     */
     Render::CRenderer::SelectMeshInfo const& CRenderer::getSelectionInfo()
     {
-        if(mSelectMeshInfo.miMeshID >= 0)
-        {
-            mSelectMeshInfo.mMinPosition = maMeshExtents[mSelectMeshInfo.miMeshID].mMinPosition;
-            mSelectMeshInfo.mMaxPosition = maMeshExtents[mSelectMeshInfo.miMeshID].mMaxPosition;
-        }
-
         return mSelectMeshInfo;
     }
 
