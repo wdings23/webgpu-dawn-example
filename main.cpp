@@ -414,31 +414,26 @@ void start()
                 giRightButtonHeld = 0;
             }
         }
+
+        double xpos = 0.0, ypos = 0.0;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        if(giLeftButtonHeld || giRightButtonHeld)
+        {
+            giLastX = (int32_t)xpos;
+            giLastY = (int32_t)ypos;
+        }
+        
+        if(giLeftButtonHeld)
+        {
+            gRenderer.highLightSelectedMesh(giLastX, giLastY);
+        }
+
     };
 
     auto mouseMove = [](GLFWwindow* window, double xpos, double ypos)
     {
         if(giLeftButtonHeld)
         {
-            int32_t iSelectedX = -1;
-            if(giLastX == -1)
-            {
-                giLastX = (int32_t)xpos;
-                iSelectedX = giLastX;
-            }
-
-            int32_t iSelectedY = -1;
-            if(giLastY == -1)
-            {
-                giLastY = (int32_t)ypos;
-                iSelectedY = giLastY;
-            }
-
-            if(iSelectedX != -1 && iSelectedY != -1)
-            {
-                gRenderer.highLightSelectedMesh(iSelectedX, iSelectedY);
-            }
-
             handleCameraMouseRotate((int32_t)xpos, (int32_t)ypos, giLastX, giLastY);
             giLastX = (int32_t)xpos;
             giLastY = (int32_t)ypos;
