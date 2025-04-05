@@ -541,8 +541,8 @@ namespace Render
         );
 
         Render::CRenderJob::CreateInfo createInfo = {};
-        createInfo.miScreenWidth = 512;
-        createInfo.miScreenHeight = 512;
+        createInfo.miScreenWidth = desc.miScreenWidth;
+        createInfo.miScreenHeight = desc.miScreenHeight;
         rapidjson::Document doc;
         {
             doc.Parse(acFileContentBuffer.data());

@@ -22,8 +22,8 @@ wgpu::RenderPipeline pipeline;
 
 wgpu::Surface surface;
 wgpu::TextureFormat format;
-const uint32_t kWidth = 512;
-const uint32_t kHeight = 512;
+const uint32_t kWidth = 1024;
+const uint32_t kHeight = 1024;
 
 struct UniformData
 {
@@ -309,7 +309,7 @@ void start()
     gCameraLookAt = gInitialCameraLookAt;
     gCameraPosition = gInitialCameraPosition;
     gCameraUp = float3(0.0f, 1.0f, 0.0f);
-    gfSpeed = 0.01f;
+    gfSpeed = 0.1f;
     giLeftButtonHeld = giRightButtonHeld = 0;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -493,6 +493,7 @@ int main()
 
     wgpu::RequestAdapterOptions adapterOptions = {};
     adapterOptions.backendType = wgpu::BackendType::Vulkan;
+    adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
     wgpu::Future future = instance.RequestAdapter(
         &adapterOptions,
         wgpu::CallbackMode::WaitAnyOnly,
@@ -527,7 +528,7 @@ int main()
     };
     wgpu::Limits requireLimits = {};
     requireLimits.maxBufferSize = 1000000000;
-      
+
     wgpu::DawnTogglesDescriptor toggleDesc = {};
     toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;
     toggleDesc.enabledToggleCount = sizeof(aszToggleNames) / sizeof(*aszToggleNames);
@@ -597,8 +598,8 @@ void handleCameraMouseRotate(
     float fDiffX = float(iX - giLastX) * -1.0f;
     float fDiffY = float(iY - giLastY);
 
-    float fDeltaX = (2.0f * 3.14159f) / 512.0f;
-    float fDeltaY = (2.0f * 3.14159f) / 512.0f;
+    float fDeltaX = (2.0f * 3.14159f) / (float)kWidth;
+    float fDeltaY = (2.0f * 3.14159f) / (float)kHeight;
 
     gCameraAngle.y += fDiffX * gfRotationSpeed * fDeltaY;
     gCameraAngle.x += fDiffY * gfRotationSpeed * fDeltaX;
