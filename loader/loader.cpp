@@ -44,6 +44,8 @@ namespace Loader
         *(gacTempMemory + fetch->numBytes) = 0;
         emscripten_fetch_close(fetch);
 
+        giTempMemorySize = fetch->numBytes;
+
         bDoneLoading = true;
     }
 
@@ -54,6 +56,8 @@ namespace Loader
     {
         printf("!!! error fetching data !!!\n");
         emscripten_fetch_close(fetch);
+
+        giTempMemorySize = 0;
 
         bDoneLoading = true;
     }
