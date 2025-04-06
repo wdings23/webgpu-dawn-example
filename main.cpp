@@ -599,6 +599,7 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 
     wgpu::RequiredLimits requiredLimits = {};
     requiredLimits.limits.maxBufferSize = 400000000;
+    requiredLimits.limits.maxStorageBufferBindingSize = 400000000;
     wgpu::DeviceDescriptor deviceDesc = {};
     deviceDesc.requiredLimits = &requiredLimits;
     adapter.RequestDevice(

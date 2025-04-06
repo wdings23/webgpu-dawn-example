@@ -333,11 +333,14 @@ namespace Render
 #if defined(__EMSCRIPTEN__)
         char* acShaderFileContent = nullptr;
         Loader::loadFile(
-            &acFileContent,
+            &acShaderFileContent,
             shaderPath,
             true
         );
         wgslDesc.code = acShaderFileContent;
+
+        printf("shader content: %s\n", acShaderFileContent);
+
 #else 
         std::vector<char> acShaderFileContent;
         Loader::loadFile(
@@ -816,8 +819,6 @@ namespace Render
         {
             assert(!"handle this job type");
         }
-
-        
     }
 
 }   // Render
