@@ -1,5 +1,5 @@
 #include <render/render_job.h>
-#include <rapidjson/Document.h>
+#include <rapidjson/document.h>
 #include <loader/loader.h>
 #include <utils/LogPrint.h>
 
@@ -37,6 +37,8 @@ namespace Render
 #if defined(__EMSCRIPTEN__)
             doc.Parse(acFileContent);
             Loader::loadFileFree(acFileContent);
+
+            printf("parse json \"%s\"\n", createInfo.mPipelineFilePath.c_str());
 #else
             doc.Parse(acFileContent.data());
 #endif // __EMSCRIPTEN__
@@ -315,6 +317,11 @@ namespace Render
 #if defined(__EMSCRIPTEN__)
             doc.Parse(acFileContent);
             Loader::loadFileFree(acFileContent);
+
+            printf("%s : %d parse json \"%s\"\n", 
+                __FILE__,
+                __LINE__,
+                createInfo.mPipelineFilePath.c_str());
 #else 
             doc.Parse(acFileContent.data());
 #endif // __EMSCRIPTEN__
@@ -777,6 +784,8 @@ namespace Render
             mRenderPassDesc.colorAttachmentCount = (uint32_t)maOutputAttachments.size();
             mRenderPassDesc.colorAttachments = maOutputAttachments.data();
             mRenderPassDesc.depthStencilAttachment = &mDepthStencilAttachment;
+
+            printf("create pipeline: \"%s\"\n", pipelineName.c_str());
         }
         else if(mType == JobType::Compute)
         {
@@ -800,6 +809,8 @@ namespace Render
             mComputePipeline = createInfo.mpDevice->CreateComputePipeline(&pipelineDescriptor);
             std::string pipelineName = mName + " Compute Pipeline";
             mComputePipeline.SetLabel(pipelineName.c_str());
+            
+            printf("create pipeline: \"%s\"\n", pipelineName.c_str());
         }
         else
         {

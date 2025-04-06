@@ -38,7 +38,12 @@ namespace Loader
     void downloadSucceeded(emscripten_fetch_t* fetch)
     {
         printf("received %llu bytes\n", fetch->numBytes);
-        gpFetch = fetch;
+        //gpFetch = fetch;
+        gacTempMemory = (char*)malloc(fetch->numBytes + 1);
+        memcpy(gacTempMemory, fetch->data, fetch->numBytes);
+        *(gacTempMemory + fetch->numBytes) = 0;
+        emscripten_fetch_close(fetch);
+
         bDoneLoading = true;
     }
 
@@ -81,14 +86,16 @@ namespace Loader
             emscripten_sleep(100);
         }
 
-        *pacFileContentBuffer = (char*)gpFetch->data;
+        //*pacFileContentBuffer = (char*)gpFetch->data;
+        *pacFileContentBuffer = gacTempMemory;
 
         return giTempMemorySize;
     }
 
     void loadFileFree(void* pData)
     {
-        emscripten_fetch_close(gpFetch);
+        //emscripten_fetch_close(gpFetch);
+        free(gacTempMemory);
     }
 
 #else 

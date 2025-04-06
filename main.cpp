@@ -589,8 +589,13 @@ void GetAdapter(void (*callback)(wgpu::Adapter)) {
 }
 
 void GetDevice(void (*callback)(wgpu::Device)) {
+
+    wgpu::RequiredLimits requiredLimits = {};
+    requiredLimits.limits.maxBufferSize = 400000000;
+    wgpu::DeviceDescriptor deviceDesc = {};
+    deviceDesc.requiredLimits = &requiredLimits;
     adapter.RequestDevice(
-        nullptr,
+        &deviceDesc,
         // TODO(https://bugs.chromium.org/p/dawn/issues/detail?id=1892): Use
         // wgpu::RequestDeviceStatus and wgpu::Device.
         [](WGPURequestDeviceStatus status, WGPUDevice cDevice,
