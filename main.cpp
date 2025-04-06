@@ -714,9 +714,9 @@ int main()
     );
 
     instance.WaitAny(future2, UINT64_MAX);
+    start();
 #endif // __EMSCRIPTEN__
 
-    start();
 }
 
 

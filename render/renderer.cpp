@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-#define TINYEXR_IMPLEMENTATION
-#include <tinyexr/tinyexr.h>
-#include <tinyexr/miniz.c>
+//#define TINYEXR_IMPLEMENTATION
+//#include <tinyexr/tinyexr.h>
+//#include <tinyexr/miniz.c>
 
 #include <utils/LogPrint.h>
 
@@ -101,14 +101,26 @@ namespace Render
         mpDevice = desc.mpDevice;
         wgpu::Device& device = *mpDevice;
 
+        
+#if defined(__EMSCRIPTEN__)
+        char* acTriangleBuffer = nullptr;
+        Loader::loadFile(&acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
+        printf("acTriangleBuffer = 0x%X\n", (uint32_t)acTriangleBuffer);
+        uint32_t const* piData = (uint32_t const*)acTriangleBuffer;
+#else 
         std::vector<char> acTriangleBuffer;
         Loader::loadFile(acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
         uint32_t const* piData = (uint32_t const*)acTriangleBuffer.data();
+#endif // __EMSCRIPTEN__
+        
         uint32_t iNumMeshes = *piData++;
         uint32_t iNumTotalVertices = *piData++;
         uint32_t iNumTotalTriangles = *piData++;
         uint32_t iVertexSize = *piData++;
         uint32_t iTriangleStartOffset = *piData++;
+
+        printf("num meshes: %d\n", iNumMeshes);
+        printf("num total vertices: %d\n", iNumTotalVertices);
 
         // triangle ranges for all the meshes
         maMeshTriangleRanges.resize(iNumMeshes);
@@ -132,6 +144,10 @@ namespace Render
         std::vector<uint32_t> aiTotalMeshTriangleIndices(iNumTotalTriangles * 3);
         piData = (uint32_t const*)pVertices;
         memcpy(aiTotalMeshTriangleIndices.data(), piData, iNumTotalTriangles * 3 * sizeof(uint32_t));
+
+#if defined(__EMSCRIPTEN__)
+        Loader::loadFileFree(acTriangleBuffer);
+#endif // __EMSCRIPTEN__
 
         wgpu::BufferDescriptor bufferDesc = {};
 
@@ -165,37 +181,66 @@ namespace Render
         device.GetQueue().WriteBuffer(maBuffers["meshExtents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
 
         {
+#if defined(__EMSCRIPTEN__)
+            char* acMaterialID = nullptr;
+            bufferDesc.size = Loader::loadFile(&acMaterialID, desc.mMeshFilePath + ".mid");
+#else 
+
             std::vector<char> acMaterialID;
             Loader::loadFile(acMaterialID, desc.mMeshFilePath + ".mid");
-
             bufferDesc.size = acMaterialID.size();
+#endif // __EMSCRIPTEN__
+
             bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
             maBuffers["meshMaterialIDs"] = device.CreateBuffer(&bufferDesc);
             maBuffers["meshMaterialIDs"].SetLabel("Mesh Material IDs");
             maBufferSizes["meshEmeshMaterialIDsxtents"] = (uint32_t)bufferDesc.size;
 
+#if defined(__EMSCRIPTEN__)
+            device.GetQueue().WriteBuffer(
+                maBuffers["meshMaterialIDs"],
+                0,
+                acMaterialID,
+                bufferDesc.size);
+            Loader::loadFileFree(acMaterialID);
+#else
             device.GetQueue().WriteBuffer(
                 maBuffers["meshMaterialIDs"],
                 0,
                 acMaterialID.data(),
                 acMaterialID.size());
+#endif // __EMSCRIPTEN__
         }
 
         {
+#if defined(__EMSCRIPTEN__)
+            char* acMaterials = nullptr;
+            bufferDesc.size = Loader::loadFile(&acMaterials, desc.mMeshFilePath + ".mat");
+#else
             std::vector<char> acMaterials;
             Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");
 
             bufferDesc.size = acMaterials.size();
+#endif // __EMSCRIPTEN__
             bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
             maBuffers["meshMaterials"] = device.CreateBuffer(&bufferDesc);
             maBuffers["meshMaterials"].SetLabel("Mesh Materials");
             maBufferSizes["meshMaterials"] = (uint32_t)bufferDesc.size;
 
+#if defined(__EMSCRIPTEN__)
+            device.GetQueue().WriteBuffer(
+                maBuffers["meshMaterials"],
+                0,
+                acMaterials,
+                bufferDesc.size);
+            Loader::loadFileFree(acMaterials);
+#else 
             device.GetQueue().WriteBuffer(
                 maBuffers["meshMaterials"],
                 0,
                 acMaterials.data(),
                 acMaterials.size());
+#endif // __EMSCRIPTEN__
         }
 
         bufferDesc.size = iNumMeshes * sizeof(uint32_t);
@@ -586,12 +631,21 @@ namespace Render
     */
     void CRenderer::createRenderJobs(CreateDescriptor& desc)
     {
+#if defined(__EMSCRIPTEN__)
+        char* acFileContentBuffer = nullptr;
+        Loader::loadFile(
+            &acFileContentBuffer,
+            "render-jobs/" + desc.mRenderJobPipelineFilePath,
+            true
+        );
+#else 
         std::vector<char> acFileContentBuffer;
         Loader::loadFile(
             acFileContentBuffer,
             "render-jobs/" + desc.mRenderJobPipelineFilePath,
             true
         );
+#endif //__EMSCRIPTEN__
 
         Render::CRenderJob::CreateInfo createInfo = {};
         createInfo.miScreenWidth = desc.miScreenWidth;
@@ -608,7 +662,12 @@ namespace Render
 
         rapidjson::Document doc;
         {
+#if defined(__EMSCRIPTEN__)
+            doc.Parse(acFileContentBuffer);
+            Loader::loadFileFree(acFileContentBuffer);
+#else 
             doc.Parse(acFileContentBuffer.data());
+#endif //__EMSCRIPTEN__
         }
 
         std::vector<std::string> aRenderJobNames;

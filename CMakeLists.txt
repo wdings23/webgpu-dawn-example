@@ -43,15 +43,23 @@ file(GLOB_RECURSE EXTERNAL_DIR
 source_group("external" FILES ${EXTERNAL_DIR})
 
 if(EMSCRIPTEN)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+    -g --proxy-to-worker -O2"
+  )
   set_target_properties(app PROPERTIES SUFFIX ".html")
   target_link_options(app PRIVATE 
     "-sUSE_WEBGPU=1" 
     "-sUSE_GLFW=3" 
     "-sASYNCIFY" 
-    "-sMODULARIZE" 
-    "-sEXPORT_ES6=1" 
-    "-sENVIRONMENT='web'" 
-    "-sFETCH=1")
+    #"-sMODULARIZE" 
+    #"-sEXPORTED_RUNTIME_METHODS=['emscripten_fetch']"
+    #"-sEXPORT_ES6=1" 
+    "-sALLOW_MEMORY_GROWTH"
+    "-sINITIAL_MEMORY=327680000"
+    "-sENVIRONMENT='worker'" 
+    "-sFETCH=1"
+    "-sUSE_PTHREADS=1"
+    "-sASSERTIONS")
 else()
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
   set(DAWN_FETCH_DEPENDENCIES ON)

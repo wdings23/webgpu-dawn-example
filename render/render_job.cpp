@@ -16,16 +16,30 @@ namespace Render
         mType = createInfo.mJobType;
         mPassType = createInfo.mPassType;
 
+#if defined(__EMSCRIPTEN__)
+        char* acFileContent = nullptr;
+        Loader::loadFile(
+            &acFileContent,
+            createInfo.mPipelineFilePath,
+            true
+        );
+#else 
         std::vector<char> acFileContent;
         Loader::loadFile(
             acFileContent,
             createInfo.mPipelineFilePath,
             true
         );
+#endif // __EMSCRIPTEN__
 
         rapidjson::Document doc;
         {
+#if defined(__EMSCRIPTEN__)
+            doc.Parse(acFileContent);
+            Loader::loadFileFree(acFileContent);
+#else
             doc.Parse(acFileContent.data());
+#endif // __EMSCRIPTEN__
         }
 
         std::vector< wgpu::ColorTargetState> aTargetStates;
@@ -280,34 +294,63 @@ namespace Render
         mType = createInfo.mJobType;
         mPassType = createInfo.mPassType;
 
+#if defined(__EMSCRIPTEN__)
+        char* acFileContent = nullptr;
+        Loader::loadFile(
+            &acFileContent,
+            createInfo.mPipelineFilePath,
+            true
+        );
+#else 
         std::vector<char> acFileContent;
         Loader::loadFile(
             acFileContent,
             createInfo.mPipelineFilePath,
             true
         );
+#endif // __EMSCRIPTEN__
 
         rapidjson::Document doc;
         {
+#if defined(__EMSCRIPTEN__)
+            doc.Parse(acFileContent);
+            Loader::loadFileFree(acFileContent);
+#else 
             doc.Parse(acFileContent.data());
+#endif // __EMSCRIPTEN__
         }
 
         // shader code
+        wgpu::ShaderModuleWGSLDescriptor wgslDesc = {};
         std::string shaderPath = std::string("shaders/") + doc["Shader"].GetString();
+#if defined(__EMSCRIPTEN__)
+        char* acShaderFileContent = nullptr;
+        Loader::loadFile(
+            &acFileContent,
+            shaderPath,
+            true
+        );
+        wgslDesc.code = acShaderFileContent;
+#else 
         std::vector<char> acShaderFileContent;
         Loader::loadFile(
             acShaderFileContent,
             shaderPath,
             true
         );
-        wgpu::ShaderModuleWGSLDescriptor wgslDesc = {};
         wgslDesc.code = acShaderFileContent.data();
+#endif // __EMSCRIPTEN__
+
         wgpu::ShaderModuleDescriptor shaderModuleDescriptor
         {
             .nextInChain = &wgslDesc
         };
         wgpu::ShaderModule shaderModule = createInfo.mpDevice->CreateShaderModule(&shaderModuleDescriptor);
         shaderModule.SetLabel(std::string(mName + " Shader Module").c_str());
+
+#if defined(__EMSCRIPTEN__)
+        Loader::loadFileFree(acShaderFileContent);
+#endif // __EMSCRIPTEN__
 
         // fill out input attachments 
         std::vector< wgpu::ColorTargetState> aTargetStates;
@@ -480,7 +523,7 @@ namespace Render
                 bindGroupEntry.textureView = textureView;
                 
                 DEBUG_PRINTF("\tgroup 0 binding %d read texture \"%s\"\n",
-                    aaBindGroupLayoutEntries[0].size(),
+                    (uint32_t)aaBindGroupLayoutEntries[0].size(),
                     attachmentName.c_str());
             }
             else if(attachmentType == "TextureOutput")
@@ -493,7 +536,7 @@ namespace Render
                 bindGroupEntry.textureView = textureView;
 
                 DEBUG_PRINTF("\tgroup 0 binding %d write texture \"%s\"\n",
-                    aaBindGroupLayoutEntries[0].size(),
+                    (uint32_t)aaBindGroupLayoutEntries[0].size(),
                     attachmentName.c_str());
             }
             else if(attachmentType == "BufferInput")
@@ -508,7 +551,7 @@ namespace Render
                 bindGroupEntry.buffer = *mInputBufferAttachments[attachmentName];
 
                 DEBUG_PRINTF("\tgroup 0 binding %d read buffer \"%s\"\n",
-                    aaBindGroupLayoutEntries[0].size(),
+                    (uint32_t)aaBindGroupLayoutEntries[0].size(),
                     attachmentName.c_str());
             }
             else if(attachmentType == "BufferOutput")
@@ -524,7 +567,7 @@ namespace Render
                 bindGroupEntry.buffer = mOutputBufferAttachments[attachmentName];
 
                 DEBUG_PRINTF("\tgroup 0 binding %d write buffer \"%s\"\n",
-                    aaBindGroupLayoutEntries[0].size(),
+                    (uint32_t)aaBindGroupLayoutEntries[0].size(),
                     attachmentName.c_str());
             }
 
@@ -556,7 +599,7 @@ namespace Render
                 bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
 
                 DEBUG_PRINTF("\tgroup 1 binding %d texture \"%s\"\n",
-                    aaBindGroupLayoutEntries[1].size(),
+                    (uint32_t)aaBindGroupLayoutEntries[1].size(),
                     uniformName.c_str());
             }
             else if(uniformType == "buffer")
@@ -569,7 +612,7 @@ namespace Render
                     bindingLayout.buffer.type = wgpu::BufferBindingType::Storage;
 
                     DEBUG_PRINTF("\tgroup 1 binding %d write buffer \"%s\"\n",
-                        aaBindGroupLayoutEntries[1].size(),
+                        (uint32_t)aaBindGroupLayoutEntries[1].size(),
                         uniformName.c_str());
                 }
                 else if(uniformUsage == "uniform")
@@ -577,7 +620,7 @@ namespace Render
                     bindingLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 
                     DEBUG_PRINTF("\tgroup 1 binding %d uniform buffer \"%s\"\n",
-                        aaBindGroupLayoutEntries[1].size(),
+                        (uint32_t)aaBindGroupLayoutEntries[1].size(),
                         uniformName.c_str());
                 }
                 
