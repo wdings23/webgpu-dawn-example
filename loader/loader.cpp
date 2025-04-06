@@ -42,9 +42,10 @@ namespace Loader
         gacTempMemory = (char*)malloc(fetch->numBytes + 1);
         memcpy(gacTempMemory, fetch->data, fetch->numBytes);
         *(gacTempMemory + fetch->numBytes) = 0;
-        emscripten_fetch_close(fetch);
-
         giTempMemorySize = fetch->numBytes;
+        printf("setting %d bytes\n", giTempMemorySize);
+
+        emscripten_fetch_close(fetch);
 
         bDoneLoading = true;
     }
@@ -92,6 +93,11 @@ namespace Loader
 
         //*pacFileContentBuffer = (char*)gpFetch->data;
         *pacFileContentBuffer = gacTempMemory;
+
+        printf("%s : %d returning size %d\n",
+            __FILE__,
+            __LINE__,
+            giTempMemorySize);
 
         return giTempMemorySize;
     }

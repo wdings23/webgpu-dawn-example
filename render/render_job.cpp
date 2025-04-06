@@ -339,7 +339,7 @@ namespace Render
         );
         wgslDesc.code = acShaderFileContent;
 
-        printf("shader content: %s\n", acShaderFileContent);
+        //printf("shader content: %s\n", acShaderFileContent);
 
 #else 
         std::vector<char> acShaderFileContent;

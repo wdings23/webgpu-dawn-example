@@ -104,8 +104,8 @@ namespace Render
         
 #if defined(__EMSCRIPTEN__)
         char* acTriangleBuffer = nullptr;
-        Loader::loadFile(&acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
-        printf("acTriangleBuffer = 0x%X\n", (uint32_t)acTriangleBuffer);
+        uint64_t iSize = Loader::loadFile(&acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
+        printf("acTriangleBuffer = 0x%X size: %lld\n", (uint32_t)acTriangleBuffer, iSize);
         uint32_t const* piData = (uint32_t const*)acTriangleBuffer;
 #else 
         std::vector<char> acTriangleBuffer;
@@ -216,6 +216,7 @@ namespace Render
 #if defined(__EMSCRIPTEN__)
             char* acMaterials = nullptr;
             bufferDesc.size = Loader::loadFile(&acMaterials, desc.mMeshFilePath + ".mat");
+            printf("mesh material size: %d\n", (uint32_t)bufferDesc.size);
 #else
             std::vector<char> acMaterials;
             Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");

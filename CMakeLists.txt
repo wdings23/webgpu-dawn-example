@@ -44,7 +44,7 @@ source_group("external" FILES ${EXTERNAL_DIR})
 
 if(EMSCRIPTEN)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -g -O0"
+    -g -O3"
   )
   set_target_properties(app PROPERTIES SUFFIX ".html")
   target_link_options(app PRIVATE 
