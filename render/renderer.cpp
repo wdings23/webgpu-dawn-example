@@ -765,6 +765,8 @@ namespace Render
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
         wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
+        assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
+        assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
 
         return swapChainTexture;
     }

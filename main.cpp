@@ -287,8 +287,7 @@ void render()
 void initGraphics() 
 {
     configureSurface();
-    createRenderPipeline();
-
+    
     wgpu::SamplerDescriptor samplerDesc = {};
     gSampler = device.CreateSampler(&samplerDesc);
 
@@ -302,6 +301,8 @@ void initGraphics()
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
     
+    createRenderPipeline();
+
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
 }
