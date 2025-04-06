@@ -21,8 +21,8 @@ wgpu::RenderPipeline pipeline;
 
 wgpu::Surface surface;
 wgpu::TextureFormat format;
-const uint32_t kWidth = 1024;
-const uint32_t kHeight = 1024;
+const uint32_t kWidth = 512;
+const uint32_t kHeight = 512;
 
 struct UniformData
 {
@@ -88,13 +88,21 @@ void configureSurface()
     surface.GetCapabilities(adapter, &capabilities);
     format = capabilities.formats[0];
 
-    wgpu::SurfaceConfiguration config{
-        .device = device,
-        .format = format,
-        .width = kWidth,
-        .height = kHeight,
-        .presentMode = wgpu::PresentMode::Immediate
-    };
+    printf("%s : %d format = %d\n",
+        __FILE__,
+        __LINE__,
+        (uint32_t)format);
+
+    wgpu::TextureFormat viewFormat = wgpu::TextureFormat::BGRA8Unorm;
+    wgpu::SurfaceConfiguration config = {};
+    config.device = device;
+    config.format = format;
+    config.width = kWidth;
+    config.height = kHeight;
+    config.viewFormats = &viewFormat;
+    config.viewFormatCount = 1;
+    config.presentMode = wgpu::PresentMode::Fifo;
+
     surface.Configure(&config);
 
     wgpu::SurfaceTexture surfaceTexture;
@@ -278,6 +286,9 @@ void render()
 */
 void initGraphics() 
 {
+    configureSurface();
+    createRenderPipeline();
+
     wgpu::SamplerDescriptor samplerDesc = {};
     gSampler = device.CreateSampler(&samplerDesc);
 
@@ -291,9 +302,6 @@ void initGraphics()
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
     
-    configureSurface();
-    createRenderPipeline();
-
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
 }
@@ -303,13 +311,6 @@ void initGraphics()
 */
 void start() 
 {
-#if defined(__EMSCRIPTEN__)
-    wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
-    canvasDesc.selector = "#canvas";
-    wgpu::SurfaceDescriptor surfaceDesc{.nextInChain = &canvasDesc};
-    surface = instance.CreateSurface(&surfaceDesc);
-#else
-
     if(!glfwInit()) 
     {
         return;
@@ -327,7 +328,14 @@ void start()
     GLFWwindow* window =
         glfwCreateWindow(kWidth, kHeight, "WebGPU window", nullptr, nullptr);
 
+#if defined(__EMSCRIPTEN__)
+    wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
+    canvasDesc.selector = "#canvas";
+    wgpu::SurfaceDescriptor surfaceDesc{.nextInChain = &canvasDesc};
+    surface = instance.CreateSurface(&surfaceDesc);
+#else
     surface = wgpu::glfw::CreateSurfaceForWindow(instance, window);
+#endif // __EMSCRIPTEN__
 
     auto keyCallBack = [](GLFWwindow* window, int key, int scancode, int action, int mods)
     {
@@ -551,8 +559,6 @@ void start()
 
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
     glfwSetCursorPosCallback(window, mouseMove);
-
-#endif // __EMSCRIPTEN__
 
     initGraphics();
 

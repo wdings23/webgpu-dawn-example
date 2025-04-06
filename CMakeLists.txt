@@ -44,7 +44,7 @@ source_group("external" FILES ${EXTERNAL_DIR})
 
 if(EMSCRIPTEN)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-    -g --proxy-to-worker -O0"
+    -g -O0"
   )
   set_target_properties(app PROPERTIES SUFFIX ".html")
   target_link_options(app PRIVATE 
@@ -58,7 +58,7 @@ if(EMSCRIPTEN)
     "-sINITIAL_MEMORY=327680000"
     "-sENVIRONMENT='worker'" 
     "-sFETCH=1"
-    "-sUSE_PTHREADS=1"
+    #"-sUSE_PTHREADS=1"
     "-sASSERTIONS"
     "-sSTACK_SIZE=1048576")
 else()
