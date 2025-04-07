@@ -1,0 +1,54 @@
+{
+    "Type": "Compute",
+    "PassType": "Compute",
+    "Shader": "mesh-culling-compute.shader",
+    "Attachments": [
+        {
+            "Name" : "Draw Calls",
+            "Type": "BufferOutput",
+            "Size": 10000000,
+            "Usage": "Indirect"
+        },
+        {
+            "Name" : "Num Draw Calls",
+            "Type": "BufferOutput",
+            "Size": 1024,
+            "Usage": "Indirect"
+        },
+        {
+            "Name" : "Visible Mesh IDs",
+            "Type": "BufferOutput",
+            "Size": 1048576
+        }
+    ],
+    "ShaderResources": [
+        { 
+            "name" : "uniformBuffer",
+            "type" : "buffer",
+            "size" : 1024,
+            "shader_stage" : "all",
+            "usage": "uniform"
+        },
+        {
+            "name": "meshTriangleIndexRanges",
+            "type": "buffer",
+            "shader_stage": "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
+            "name": "meshExtents",
+            "type": "buffer",
+            "shader_stage": "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
+            "name" : "visibilityFlags",
+            "type": "buffer",
+            "shader_stage" : "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        }
+    ]
+}

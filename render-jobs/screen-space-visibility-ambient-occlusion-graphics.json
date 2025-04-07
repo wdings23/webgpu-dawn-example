@@ -1,0 +1,62 @@
+{
+    "Type": "Graphics",
+    "PassType": "Full Triangle",
+    "Shader": "screen-space-visiblity-bitmask-ambient-occlusion-graphics.shader",
+    "Attachments": [
+        {
+            "Name" : "Ambient Occlusion Output",
+            "Type": "TextureOutput",
+            "Format": "rgba32float"
+        },
+        
+        {
+            "Name" : "World Position Output",
+            "Type": "TextureInput",
+            "ParentJob": "Deferred Indirect Graphics"
+        },
+        {
+            "Name" : "Normal Output",
+            "Type": "TextureInput",
+            "ParentJob": "Deferred Indirect Graphics"
+        },
+        {
+            "Name" : "Material Output",
+            "Type": "TextureInput",
+            "ParentJob": "Deferred Indirect Graphics"
+        }
+    ],
+    "ShaderResources": [
+        { 
+            "name" : "uniformBuffer",
+            "type" : "buffer",
+            "size" : 1024,
+            "shader_stage" : "all",
+            "usage": "uniform"
+        }
+    ],
+    "BlendStates": [
+        {
+            "Enabled": "False"
+        }
+    ],
+    "DepthStencilState":
+    {
+        "DepthEnable": "True",
+        "DepthWriteMask": "One",
+        "DepthFunc": "LessEqual",
+        "StencilEnable": "False"
+    },
+    "RasterState":
+    {
+        "FillMode": "Solid",
+        "CullMode": "None",
+        "FrontFace": "CounterClockwise"
+    },
+    "VertexFormat":
+    [
+        "Vec4",
+        "Vec4",
+        "Vec4"
+    ],
+    "UseGlobalTextures": "True"
+}

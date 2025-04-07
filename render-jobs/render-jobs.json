@@ -1,0 +1,24 @@
+{
+    "Jobs" :
+    [
+        {
+            "Name": "Mesh Culling Compute",
+            "Pipeline": "mesh-culling-compute.json",
+            "Type": "Compute",
+            "PassType": "Compute",
+            "Dispatch": [1024, 1, 1]
+        },
+        {
+            "Name": "Deferred Indirect Graphics",
+            "Pipeline": "deferred.json",
+            "Type": "Graphics",
+            "PassType": "Draw Meshes"
+        },
+        {
+            "Name": "Mesh Selection Graphics",
+            "Pipeline": "mesh-selection-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        }
+    ]
+}
