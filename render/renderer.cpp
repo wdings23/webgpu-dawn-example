@@ -310,7 +310,7 @@ namespace Render
         bufferDesc.size = 1024;
         mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
         mOutputImageBuffer.SetLabel("Read Back Image Buffer");
-        
+
         mpInstance = desc.mpInstance;
     }
 
@@ -452,6 +452,63 @@ namespace Render
             );
 
             printf("updated mesh selection uniform\n");
+#else 
+            auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
+            {
+                if(status == wgpu::MapAsyncStatus::Success)
+                {
+                    wgpu::BufferMapState mapState = mOutputImageBuffer.GetMapState();
+
+                    SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange(0, sizeof(SelectMeshInfo));
+                    assert(pInfo != nullptr);
+                    memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
+                    mSelectMeshInfo.miMeshID -= 1;
+                    mOutputImageBuffer.Unmap();
+
+                    mCaptureImageJobName = "";
+                    mCaptureImageName = "";
+                    mCaptureUniformBufferName = "";
+                    mbWaitingForMeshSelection = false;
+                    mbSelectedBufferCopied = false;
+
+                    DEBUG_PRINTF("!!! selected mesh: %d coordinate (%d, %d) min (%.4f, %.4f, %.4f) max(%.4f, %.4f, %.4f) !!!\n",
+                        pInfo->miMeshID,
+                        pInfo->miSelectionCoordX,
+                        pInfo->miSelectionCoordY,
+                        pInfo->mMinPosition.x,
+                        pInfo->mMinPosition.y,
+                        pInfo->mMinPosition.z,
+                        pInfo->mMaxPosition.x,
+                        pInfo->mMaxPosition.y,
+                        pInfo->mMaxPosition.z);
+                }
+            };
+
+            // read back mesh selection buffer from shader
+            //uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
+            uint32_t iFileSize = sizeof(SelectMeshInfo);
+            wgpu::Future future = mOutputImageBuffer.MapAsync(
+                wgpu::MapMode::Read,
+                0,
+                iFileSize,
+                wgpu::CallbackMode::WaitAnyOnly,
+                callBack);
+
+            assert(mpInstance);
+            mpInstance->WaitAny(future, UINT64_MAX);
+
+            MeshSelectionUniformData uniformBuffer;
+            mSelectedCoord.x = mSelectedCoord.y = -1;
+            uniformBuffer.miSelectionX = mSelectedCoord.x;
+            uniformBuffer.miSelectionY = mSelectedCoord.y;
+            uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
+
+            printf("uniform selected mesh = %d\n", uniformBuffer.miSelectedMesh);
+            mpDevice->GetQueue().WriteBuffer(
+                maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
+                0,
+                &uniformBuffer,
+                sizeof(MeshSelectionUniformData));
 
 #endif // __EMSCRIPTEN__
         }
@@ -615,7 +672,7 @@ namespace Render
         // mouse selection state, get the selected mesh from the shader
         if(mbWaitingForMeshSelection)
         {
-#if !defined(__EMSCRIPTEN__)
+#if 0 // !defined(__EMSCRIPTEN__)
             auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
             {
                 if(status == wgpu::MapAsyncStatus::Success)
@@ -623,6 +680,7 @@ namespace Render
                     wgpu::BufferMapState mapState = mOutputImageBuffer.GetMapState();
                     
                     SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange();
+                    assert(pInfo != nullptr);
                     memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
                     mSelectMeshInfo.miMeshID -= 1;
                     mOutputImageBuffer.Unmap();
@@ -962,7 +1020,7 @@ namespace Render
         mOutputImageBuffer.Destroy();
 
         printf("!!! done reading back from buffer frame: %d !!!\n", miFrame);
-    }
 #endif // __EMSCRIPTEN__
+    }
 
 }   // Render
