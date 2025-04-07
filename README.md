@@ -8,7 +8,7 @@ cmake -B build && cmake --build build -j4
 # Build the app with Emscripten.
 emcmake cmake -B build-web && cmake --build build-web -j4
 
-# Mesh Assets are built separately, converting OBJ files to binary format for faster loading. It uses a local version of obj2binary application. Will post that here soon.
+# Mesh Assets are built separately, converting OBJ files to binary format for faster loading. It uses a local version of obj2binary application.
 
 # Controls
 Keyboard Button
