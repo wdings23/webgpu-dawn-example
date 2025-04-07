@@ -32,12 +32,10 @@ npx http-server -p 8000
 # local url
 http://localhost:8000/app.html
 
-# web version
-[![video](https://img.youtube.com/vi/vyeaB_ttL0w/0.jpg)](https://www.youtube.com/watch?v=vyeaB_ttL0w)
+# web version (youtube clip)
+[![video](https://img.youtube.com/vi/8E8v86ZudF4/0.jpg)](https://www.youtube.com/watch?v=8E8v86ZudF4)
 
 
-
-
-# native version
-[![web version](https://img.youtube.com/vi/8HrhYnDzdE8/0.jpg)](https://www.youtube.com/watch?v=8HrhYnDzdE8)
+# native version (youtube clip)
+[![web version](https://img.youtube.com/vi/CzTR04N-yy4/0.jpg)](https://www.youtube.com/watch?v=CzTR04N-yy4)
 
