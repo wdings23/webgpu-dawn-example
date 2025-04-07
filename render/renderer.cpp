@@ -485,7 +485,6 @@ namespace Render
             };
 
             // read back mesh selection buffer from shader
-            //uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
             uint32_t iFileSize = sizeof(SelectMeshInfo);
             wgpu::Future future = mOutputImageBuffer.MapAsync(
                 wgpu::MapMode::Read,
@@ -647,98 +646,6 @@ namespace Render
         mpDevice->GetQueue().Submit(
             (uint32_t)aCommandBuffer.size(), 
             aCommandBuffer.data());
-
-#if defined(__EMSCRIPTEN__)
-        
-        static bool bQueueDone;
-        bQueueDone = false;
-        auto callBack = [](WGPUQueueWorkDoneStatus status, void* pUserData)
-        {
-            if(status == WGPUQueueWorkDoneStatus_Success)
-            {
-               bQueueDone = true;
-            }
-        };
-        mpDevice->GetQueue().OnSubmittedWorkDone(callBack, nullptr);
-
-        uint32_t iWait = 0;
-        while(bQueueDone == false)
-        {
-            emscripten_sleep(10);
-        }
-#endif // __EMSCRIPTEN__
-
-
-        // mouse selection state, get the selected mesh from the shader
-        if(mbWaitingForMeshSelection)
-        {
-#if 0 // !defined(__EMSCRIPTEN__)
-            auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
-            {
-                if(status == wgpu::MapAsyncStatus::Success)
-                {
-                    wgpu::BufferMapState mapState = mOutputImageBuffer.GetMapState();
-                    
-                    SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange();
-                    assert(pInfo != nullptr);
-                    memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
-                    mSelectMeshInfo.miMeshID -= 1;
-                    mOutputImageBuffer.Unmap();
-
-                    if(miFrame - miStartCaptureFrame >= 3)
-                    {
-                        // reset to signal we're done
-                        mCaptureImageJobName = "";
-                        mCaptureImageName = "";
-                        mCaptureUniformBufferName = "";
-                        mbWaitingForMeshSelection = false;
-                    }
-
-                    DEBUG_PRINTF("!!! selected mesh: %d coordinate (%d, %d) min (%.4f, %.4f, %.4f) max(%.4f, %.4f, %.4f) !!!\n", 
-                        pInfo->miMeshID,
-                        pInfo->miSelectionCoordX,
-                        pInfo->miSelectionCoordY,
-                        pInfo->mMinPosition.x,
-                        pInfo->mMinPosition.y,
-                        pInfo->mMinPosition.z,
-                        pInfo->mMaxPosition.x,
-                        pInfo->mMaxPosition.y,
-                        pInfo->mMaxPosition.z);
-                }
-            };
-
-            // read back mesh selection buffer from shader
-            //uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
-            uint32_t iFileSize = sizeof(SelectMeshInfo);
-            wgpu::Future future = mOutputImageBuffer.MapAsync(
-                wgpu::MapMode::Read,
-                0,
-                iFileSize,
-                wgpu::CallbackMode::WaitAnyOnly,
-                callBack);
-
-            assert(mpInstance);
-            mpInstance->WaitAny(future, UINT64_MAX);
-#endif // __EMSCRIPTEN__
-
-            // update uniform buffer, signalling selection is done
-            if(miFrame - miStartCaptureFrame >= 3)
-            {
-                mSelectedCoord.x = mSelectedCoord.y = -1;
-
-                MeshSelectionUniformData uniformBuffer;
-                uniformBuffer.miSelectionX = mSelectedCoord.x;
-                uniformBuffer.miSelectionY = mSelectedCoord.y;
-                uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
-
-                mpDevice->GetQueue().WriteBuffer(
-                    maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
-                    0,
-                    &uniformBuffer,
-                    sizeof(MeshSelectionUniformData)
-                );
-            }
-        }
 
         ++miFrame;
     }
