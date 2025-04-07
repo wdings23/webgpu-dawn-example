@@ -133,12 +133,6 @@ namespace Render
     
         uint32_t                                miStartCaptureFrame = 0;
         bool                                    mbSelectedBufferCopied = false;
-
-#if defined(__EMSCRIPTEN__)
-        void const*                             mpReadBackData = nullptr;
-        
-#endif // __EMSCRIPTEN__
-        void readBackBuffer();
     };
 
 }   // Render
