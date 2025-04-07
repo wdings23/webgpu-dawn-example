@@ -1,0 +1,82 @@
+{
+    "Type": "Graphics",
+    "PassType": "Mesh Graphics",
+    "Shader": "deferred-indirect.shader",
+    "Attachments": [
+        {
+            "Name" : "World Position Output",
+            "Type": "TextureOutput",
+            "Format": "rgba32float"
+        },
+        {
+            "Name" : "Texture Coordinate Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
+        },
+        {
+            "Name" : "Normal Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
+        },
+        {
+            "Name" : "Motion Vector Output",
+            "Type": "TextureOutput",
+            "Format": "rg16float"
+        }
+    ],
+    "ShaderResources": [
+        { 
+            "name" : "indirectUniformData",
+            "type" : "buffer",
+            "size" : 1024,
+            "shader_stage" : "all",
+            "usage": "uniform"
+        },
+        {
+            "name": "materials",
+            "type": "buffer",
+            "size": 1048576,
+            "shader_stage": "all",
+            "usage": "read_only_storage"
+        },
+        {
+            "name": "meshMaterialIDs",
+            "type": "buffer",
+            "size": 1048576,
+            "shader_stage": "all",
+            "usage": "read_only_storage"
+        },
+        { 
+            "name" : "meshIndexRanges",
+            "type" : "buffer",
+            "size" : 1048576,
+            "shader_stage" : "vertex",
+            "usage": "read_only_storage"
+        }
+    ],
+    "BlendStates": [
+        {
+            "Enabled": "True"
+        }
+    ],
+    "DepthStencilState":
+    {
+        "DepthEnable": "True",
+        "DepthWriteMask": "One",
+        "DepthFunc": "LessEqual",
+        "StencilEnable": "False"
+    },
+    "RasterState":
+    {
+        "FillMode": "Solid",
+        "CullMode": "None",
+        "FrontFace": "CounterClockwise"
+    },
+    "VertexFormat":
+    [
+        "Vec4",
+        "Vec4",
+        "Vec4"
+    ],
+    "UseGlobalTextures": "True"
+}

@@ -1,0 +1,84 @@
+{
+    "Type": "Graphics",
+    "PassType": "Mesh Graphics",
+    "Shader": "deferred.shader",
+    "Attachments": [
+        {
+            "Name" : "World Position Output",
+            "Type": "TextureOutput",
+            "Format": "rgba32float"
+        },
+        {
+            "Name" : "Normal Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
+        },
+        {
+            "Name" : "Material Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
+        }
+    ],
+    "ShaderResources": [
+        { 
+            "name" : "indirectUniformData",
+            "type" : "buffer",
+            "size" : 1024,
+            "shader_stage" : "all",
+            "usage": "uniform"
+        },
+        {
+            "name": "meshMaterials",
+            "type": "buffer",
+            "shader_stage": "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
+            "name": "meshMaterialIDs",
+            "type": "buffer",
+            "shader_stage": "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        { 
+            "name" : "meshTriangleIndexRanges",
+            "type" : "buffer",
+            "shader_stage" : "vertex",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
+            "name" : "meshExtents",
+            "type": "buffer",
+            "shader_stage" : "vertex",
+            "usage": "read_only_storage",
+            "external": "true"
+        }
+    ],
+    "BlendStates": [
+        {
+            "Enabled": "False"
+        }
+    ],
+    "DepthStencilState":
+    {
+        "DepthEnable": "True",
+        "DepthWriteMask": "One",
+        "DepthFunc": "LessEqual",
+        "StencilEnable": "False"
+    },
+    "RasterState":
+    {
+        "FillMode": "Solid",
+        "CullMode": "None",
+        "FrontFace": "CounterClockwise"
+    },
+    "VertexFormat":
+    [
+        "Vec4",
+        "Vec4",
+        "Vec4"
+    ],
+    "UseGlobalTextures": "True"
+}
