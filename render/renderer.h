@@ -76,6 +76,16 @@ namespace Render
 
         SelectMeshInfo const& getSelectionInfo();
 
+        inline uint32_t getNumMeshes()
+        {
+            return (uint32_t)maMeshTriangleRanges.size();
+        }
+
+        inline void setVisibilityFlags(uint32_t* piVisibilityFlags)
+        {
+            maiVisibilityFlags = piVisibilityFlags;
+        }
+
     public:
         struct MeshExtent
         {
@@ -133,6 +143,9 @@ namespace Render
     
         uint32_t                                miStartCaptureFrame = 0;
         bool                                    mbSelectedBufferCopied = false;
+
+
+        uint32_t*                               maiVisibilityFlags = nullptr;
     };
 
 }   // Render

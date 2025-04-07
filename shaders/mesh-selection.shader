@@ -124,8 +124,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
             aSelectedMeshes[0].miMeshID = i32(iMesh + 1);
             aSelectedMeshes[0].miSelectionX = iScreenCoordX;
             aSelectedMeshes[0].miSelectionY = iScreenCoordY;
-            aSelectedMeshes[0].mMinMeshPosition = aMeshExtents[iMesh-1].mMinPosition;
-            aSelectedMeshes[0].mMaxMeshPosition = aMeshExtents[iMesh-1].mMaxPosition;
+            aSelectedMeshes[0].mMinMeshPosition = aMeshExtents[iMesh-2].mMinPosition;
+            aSelectedMeshes[0].mMaxMeshPosition = aMeshExtents[iMesh-2].mMaxPosition;
         }
     }
 

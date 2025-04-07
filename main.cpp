@@ -66,6 +66,7 @@ float3 gInitialCameraPosition(0.0f, 0.0f, -3.0f);
 float3 gInitialCameraLookAt(0.0f, 0.0f, 0.0f);
 
 std::vector<int32_t> aiHiddenMeshes;
+std::vector<uint32_t> aiVisibilityFlags;
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -78,6 +79,8 @@ void handleCameraMousePan(
     int32_t iY,
     int32_t iLastX,
     int32_t iLastY);
+
+void zoomToSelection();
 
 /*
 **
@@ -340,6 +343,11 @@ void start()
 
     auto keyCallBack = [](GLFWwindow* window, int key, int scancode, int action, int mods)
     {
+        if(action == GLFW_RELEASE)
+        {
+            return;
+        }
+
         switch(key)
         {
             case GLFW_KEY_W:
@@ -401,7 +409,7 @@ void start()
             {
                 // move meshes back from explosion
                 gfExplodeMultiplier -= 1.0f;
-                gfExplodeMultiplier = std::max(gfExplodeMultiplier, 1.0f);
+                gfExplodeMultiplier = std::max(gfExplodeMultiplier, 0.0f);
 
                 gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
 
@@ -411,17 +419,17 @@ void start()
             case GLFW_KEY_H:
             {
                 // hide mesh
-                uint32_t iFlag = 1;
+                uint32_t iFlag = 0;
                 Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
                 if(selectionInfo.miMeshID >= 0)
                 {
+                    aiVisibilityFlags[selectionInfo.miMeshID - 2] = 0;
                     gRenderer.setBufferData(
                         "visibilityFlags",
-                        &iFlag,
-                        (int32_t(selectionInfo.miMeshID) - 2) * sizeof(uint32_t),
-                        sizeof(uint32_t)
+                        aiVisibilityFlags.data(),
+                        0,
+                        uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
                     );
-
                     aiHiddenMeshes.push_back(selectionInfo.miMeshID - 2);
                 }
                 break;
@@ -430,53 +438,30 @@ void start()
             case GLFW_KEY_J:
             {
                 // show last hidden mesh
-                uint32_t iFlag = 0;
+                uint32_t iFlag = 1;
                 Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
                 if(aiHiddenMeshes.size() > 0)
                 {
-                    int32_t iMesh = aiHiddenMeshes.back();
+                    uint32_t iMesh = aiHiddenMeshes.back();
+                    aiVisibilityFlags[iMesh] = 1;
                     gRenderer.setBufferData(
                         "visibilityFlags",
-                        &iFlag,
-                        iMesh * sizeof(uint32_t),
-                        sizeof(uint32_t)
+                        aiVisibilityFlags.data(),
+                        0,
+                        uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
                     );
-
                     aiHiddenMeshes.pop_back();
                     
                 }
                 break;
             }
 
-#if 0
             case GLFW_KEY_Z:
             {
-                gState = ZOOM_TO_SELECTION;
-                Render::CRenderer::SelectMeshInfo const& selectMeshInfo = gRenderer.getSelectionInfo();
-                if(selectMeshInfo.miMeshID >= 0)
-                {
-                    float3 totalMidPt = (gRenderer.mTotalMeshExtent.mMaxPosition + gRenderer.mTotalMeshExtent.mMinPosition) * 0.5f;
-                    float3 midPt = (selectMeshInfo.mMaxPosition + selectMeshInfo.mMinPosition) * 0.5f;
-                    
-                    float fZ = (totalMidPt.z - midPt.z) * std::max(gfExplodeMultiplier, 0.0f);
-                    midPt.z = midPt.z + fZ;
-
-                    float3 diff = selectMeshInfo.mMaxPosition - selectMeshInfo.mMinPosition;
-                    float fRadius = length(diff) * 0.5f;
-                    diff = midPt - gCameraPosition;
-                    float fLength = length(diff);
-                    float fPct = (fRadius * 1.25f) / fLength;
-
-                    gCameraPosition = midPt + normalize(diff) * fRadius;
-                    gCameraLookAt = midPt;
-
-                    gInitialCameraPosition = gCameraPosition;
-                    gInitialCameraLookAt = gCameraLookAt;
-                }
-
+                zoomToSelection();
                 break;
             }
-#endif // #if 0
+
         }
 
         float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
@@ -562,6 +547,24 @@ void start()
     glfwSetCursorPosCallback(window, mouseMove);
 
     initGraphics();
+
+    if(aiVisibilityFlags.size() <= 0)
+    {
+        uint32_t iNumMeshes = gRenderer.getNumMeshes();
+        aiVisibilityFlags.resize(iNumMeshes);
+        for(uint32_t i = 0; i < iNumMeshes; i++)
+        {
+            aiVisibilityFlags[i] = 1;
+        }
+    }
+    gRenderer.setVisibilityFlags(aiVisibilityFlags.data());
+
+    gRenderer.setBufferData(
+        "visibilityFlags",
+        aiVisibilityFlags.data(),
+        0,
+        (uint32_t)(aiVisibilityFlags.size() * sizeof(uint32_t))
+    );
 
 #if defined(__EMSCRIPTEN__)
     emscripten_set_main_loop(render, 0, false);
@@ -878,3 +881,111 @@ void handleCameraMousePan(
     gCameraPosition = gCameraPosition + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
     gCameraLookAt = gCameraLookAt + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
 }
+
+
+
+/*
+**
+*/
+void toggleOtherVisibilityFlags(uint32_t iMeshID, bool bVisible)
+{
+    printf("%s : %d set %d\n", __FUNCTION__, __LINE__, bVisible);
+
+    uint32_t iDataSize = (uint32_t)sizeof(uint32_t) * (uint32_t)aiVisibilityFlags.size();
+    if(bVisible)
+    {
+        for(uint32_t i = 0; i < (uint32_t)aiVisibilityFlags.size(); i++)
+        {
+            aiVisibilityFlags[i] = 1;
+        }
+    }
+    else
+    {
+        memset(aiVisibilityFlags.data(), 0, sizeof(uint32_t) * aiVisibilityFlags.size());
+    }
+
+    for(uint32_t i = 0; i < (uint32_t)aiHiddenMeshes.size(); i++)
+    {
+        aiVisibilityFlags[aiHiddenMeshes[i]] = 0;
+    }
+
+    aiVisibilityFlags[iMeshID] = 1;
+
+    gRenderer.setBufferData(
+        "visibilityFlags",
+        aiVisibilityFlags.data(),
+        0,
+        iDataSize
+    );
+    gRenderer.setVisibilityFlags(aiVisibilityFlags.data());
+
+}
+
+float3 gSavedInitialCameraPosition;
+float3 gSavedInitialCameraLookAt;
+float3 gSavedCameraPosition;
+float3 gSavedCameraLookAt;
+float2 gSavedCameraAngle;
+
+/*
+**
+*/
+void zoomToSelection()
+{
+    printf("%s : %d\n", __FUNCTION__, __LINE__);
+
+    if(gState == ZOOM_TO_SELECTION)
+    {
+        gInitialCameraPosition = gSavedInitialCameraPosition;
+        gInitialCameraLookAt = gSavedInitialCameraLookAt;
+
+        gCameraPosition = gSavedCameraPosition;
+        gCameraLookAt = gSavedCameraLookAt;
+        gCameraAngle = gSavedCameraAngle;
+
+        gState = NORMAL;
+        toggleOtherVisibilityFlags(0, true);
+        gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
+    }
+    else
+    {
+        gState = ZOOM_TO_SELECTION;
+
+        Render::CRenderer::SelectMeshInfo const& selectMeshInfo = gRenderer.getSelectionInfo();
+        if(selectMeshInfo.miMeshID >= 0)
+        {
+            float3 totalMidPt = (gRenderer.mTotalMeshExtent.mMaxPosition + gRenderer.mTotalMeshExtent.mMinPosition) * 0.5f;
+            float3 midPt = (selectMeshInfo.mMaxPosition + selectMeshInfo.mMinPosition) * 0.5f;
+
+            //float fZ = (totalMidPt.z - midPt.z) * std::max(gfExplodeMultiplier, 0.0f);
+            //midPt.z = midPt.z - fZ;
+
+            // compute radius
+            float3 diff = selectMeshInfo.mMaxPosition - selectMeshInfo.mMinPosition;
+            float fRadius = length(diff) * 0.5f;
+
+            gSavedCameraPosition = gCameraPosition;
+            gSavedCameraLookAt = gCameraLookAt;
+
+            gSavedInitialCameraPosition = gInitialCameraPosition;
+            gSavedInitialCameraLookAt = gInitialCameraLookAt;
+
+            gSavedCameraAngle = gCameraAngle;
+
+            float fRadiusMult = 1.25f;
+
+            //gCameraPosition = midPt + normalize(diff) * fRadius;
+            gCameraPosition = midPt + float3(0.0f, 0.0f, -1.0f) * (fRadius * fRadiusMult);
+            gCameraLookAt = midPt;
+
+            gInitialCameraPosition = gCameraPosition;
+            gInitialCameraLookAt = gCameraLookAt;
+
+            gCameraAngle = float2(0.0f, 0.0f);
+
+            toggleOtherVisibilityFlags(selectMeshInfo.miMeshID - 2, false);
+            gRenderer.setExplosionMultiplier(0.0f);
+        }
+    }
+}
+

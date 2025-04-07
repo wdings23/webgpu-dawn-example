@@ -552,13 +552,20 @@ namespace Render
 #if defined(__EMSCRIPTEN__)
                     for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
                     {
-                        uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
-                        uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
-                        //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
-                        renderPassEncoder.DrawIndexedIndirect(
-                            maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
-                            iMesh * 5 * sizeof(uint32_t)
-                        );
+                        if(maiVisibilityFlags[iMesh] >= 1)
+                        {
+                            uint32_t iNumIndices = maMeshTriangleRanges[iMesh].miEnd - maMeshTriangleRanges[iMesh].miStart;
+                            uint32_t iIndexOffset = maMeshTriangleRanges[iMesh].miStart;
+                            //renderPassEncoder.DrawIndexed(iNumIndices, 1, iIndexOffset, 0, 0);
+                            renderPassEncoder.DrawIndexedIndirect(
+                                maRenderJobs["Mesh Culling Compute"]->mOutputBufferAttachments["Draw Calls"],
+                                iMesh * 5 * sizeof(uint32_t)
+                            );
+                        }
+                        //else
+                        //{
+                        //    printf("mesh %d not visible\n", iMesh);
+                        //}
                     }
 #else
                     renderPassEncoder.MultiDrawIndexedIndirect(

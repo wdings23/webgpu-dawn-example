@@ -2,6 +2,7 @@
     "Type": "Compute",
     "PassType": "Compute",
     "Shader": "mesh-culling-compute.shader",
+    "Emscripten Shader": "mesh-culling-index-compute.shader",
     "Attachments": [
         {
             "Name" : "Draw Calls",

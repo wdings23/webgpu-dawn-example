@@ -87,8 +87,15 @@ fn cs_main(
 
     if(aiVisibleFlags[iMesh] <= 0)
     {
+        aDrawCalls[iMesh].miIndexCount = 0u;
+        aDrawCalls[iMesh].miInstanceCount = 0u;
+        aDrawCalls[iMesh].miFirstIndex = 0u;
+        aDrawCalls[iMesh].miBaseVertex = 0u;
+        aDrawCalls[iMesh].miFirstInstance = 0u;
+
         return;
     }
+    
 
     let center: vec3f = (aMeshExtents[iMesh].mMaxPosition.xyz + aMeshExtents[iMesh].mMinPosition.xyz) * 0.5f;
 
@@ -134,11 +141,12 @@ bInside = true;
     {
         let iDrawCommandIndex: u32 = atomicAdd(&aNumDrawCalls[0], 1u);
 
-        aDrawCalls[iDrawCommandIndex].miIndexCount = iNumIndices;
-        aDrawCalls[iDrawCommandIndex].miInstanceCount = 1u;
-        aDrawCalls[iDrawCommandIndex].miFirstIndex = iIndexAddressOffset;
-        aDrawCalls[iDrawCommandIndex].miBaseVertex = 0;
-        aDrawCalls[iDrawCommandIndex].miFirstInstance = 0u;
+        aDrawCalls[iMesh].miIndexCount = iNumIndices;
+        aDrawCalls[iMesh].miInstanceCount = 1u;
+        aDrawCalls[iMesh].miFirstIndex = iIndexAddressOffset;
+        aDrawCalls[iMesh].miBaseVertex = 0;
+        aDrawCalls[iMesh].miFirstInstance = 0u;
+        
 
         // mark as visible
         aiVisibleMeshID[iMesh] = 1u;

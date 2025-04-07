@@ -331,6 +331,12 @@ namespace Render
         wgpu::ShaderModuleWGSLDescriptor wgslDesc = {};
         std::string shaderPath = std::string("shaders/") + doc["Shader"].GetString();
 #if defined(__EMSCRIPTEN__)
+        if(doc.HasMember("Emscripten Shader"))
+        {
+            shaderPath = std::string("shaders/") + doc["Emscripten Shader"].GetString();
+            printf("!!! USE EMSCRIPTEN SHADER !!!\n");
+        }
+
         char* acShaderFileContent = nullptr;
         Loader::loadFile(
             &acShaderFileContent,
