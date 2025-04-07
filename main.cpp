@@ -637,14 +637,72 @@ int main()
 #endif // __EMSCRIPTEN__
 
 #if defined(__EMSCRIPTEN__)
-    GetAdapter([](wgpu::Adapter a) {
-        adapter = a;
-        GetDevice([](wgpu::Device d) {
-            device = d;
-            start();
-            });
-        });
+    //GetAdapter([](wgpu::Adapter a) {
+    //    adapter = a;
+    //   GetDevice([](wgpu::Device d) {
+    //       device = d;
+    //       start();
+    //       });
+    //   
+    //});
 
+    static bool bGotAdapter;
+    bGotAdapter = false;
+    instance.RequestAdapter(
+        nullptr,
+        [](WGPURequestAdapterStatus status,
+            WGPUAdapter cAdapter,
+            const char* message,
+            void* userdata)
+        {
+            adapter = wgpu::Adapter::Acquire(cAdapter);
+
+            wgpu::AdapterInfo info = {};
+            adapter.GetInfo(&info);
+            printf("adapter: %d\n", info.deviceID);
+
+            printf("got adapter\n");
+            
+            bGotAdapter = true; 
+        },
+        nullptr);
+
+    while(bGotAdapter == false)
+    {
+        emscripten_sleep(10);
+        printf("waiting...\n");
+    }
+
+    static bool bGotDevice;
+    bGotDevice = false;
+    wgpu::RequiredLimits requiredLimits = {};
+    requiredLimits.limits.maxBufferSize = 400000000;
+    requiredLimits.limits.maxStorageBufferBindingSize = 400000000;
+    wgpu::DeviceDescriptor deviceDesc = {};
+    deviceDesc.requiredLimits = &requiredLimits;
+    adapter.RequestDevice(
+        &deviceDesc,
+        [](WGPURequestDeviceStatus status,
+            WGPUDevice cDevice,
+            const char* message,
+            void* userdata)
+        {
+            device = wgpu::Device::Acquire(cDevice);
+            bGotDevice = true;
+
+            printf("got device\n");
+        },
+        nullptr
+    );
+
+    while(bGotDevice == false)
+    {
+        emscripten_sleep(10);
+        printf("waiting for device...\n");
+    }
+
+    start();
+    
 #else
     wgpu::RequestAdapterOptions adapterOptions = {};
     adapterOptions.backendType = wgpu::BackendType::Vulkan;

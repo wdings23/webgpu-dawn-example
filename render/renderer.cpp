@@ -12,6 +12,10 @@
 #include <string>
 #include <vector>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#endif // __EMSCRIPTEN__
+
 //#define TINYEXR_IMPLEMENTATION
 //#include <tinyexr/tinyexr.h>
 //#include <tinyexr/miniz.c>
@@ -285,20 +289,6 @@ namespace Render
         
         createRenderJobs(desc);
 
-#if 0
-        // write to buffers (triangle indices, mesh extent, default uniform buffer, and materials)
-        device.GetQueue().WriteBuffer(
-            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["aMeshTriangleIndexRanges"],
-            0,
-            maMeshTriangleRanges.data(),
-            maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
-        device.GetQueue().WriteBuffer(
-            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["aMeshBBox"],
-            0,
-            maMeshExtents.data(),
-            maMeshExtents.size() * sizeof(MeshExtent));
-#endif // #if 0
-
         struct UniformData
         {
             uint32_t    miNumMeshes;
@@ -313,18 +303,14 @@ namespace Render
             0,
             &uniformData,
             sizeof(UniformData));
-
         
-#if 0
-        {
-            device.GetQueue().WriteBuffer(
-                maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["meshExtents"],
-                0,
-                maMeshExtents.data(),
-                maMeshExtents.size() * sizeof(MeshExtent));
-        }
-#endif // #if 0
-
+        bufferDesc = {};
+        bufferDesc.mappedAtCreation = false;
+        bufferDesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
+        bufferDesc.size = 1024;
+        mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
+        mOutputImageBuffer.SetLabel("Read Back Image Buffer");
+        
         mpInstance = desc.mpInstance;
     }
 
@@ -419,6 +405,57 @@ namespace Render
             }
         }
         
+        if(mCaptureImageJobName.length() > 0 && mbSelectedBufferCopied)
+        {
+#if defined(__EMSCRIPTEN__)
+            static bool bTestMapped;
+            bTestMapped = false;
+            wgpu::BufferMapCallback callBack = [](WGPUBufferMapAsyncStatus status, void* userData)
+                {
+                    printf("buffer mapped\n");
+                    bTestMapped = true;
+                };
+            mOutputImageBuffer.MapAsync(wgpu::MapMode::Read, 0, sizeof(SelectMeshInfo), callBack, nullptr);
+            while(bTestMapped == false)
+            {
+                emscripten_sleep(10);
+            }
+            SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange(0, sizeof(SelectMeshInfo));
+            memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
+            mSelectMeshInfo.miMeshID -= 1;
+            mSelectedCoord.x = pInfo->miSelectionCoordX;
+            mSelectedCoord.y = pInfo->miSelectionCoordY;
+            printf("selected mesh id: %d (%d, %d)\n", 
+                pInfo->miMeshID,
+                pInfo->miSelectionCoordX,
+                pInfo->miSelectionCoordY);
+            mOutputImageBuffer.Unmap();
+
+            mCaptureImageJobName = "";
+            mCaptureImageName = "";
+            mCaptureUniformBufferName = "";
+            mbWaitingForMeshSelection = false;
+            mbSelectedBufferCopied = false;
+            
+            MeshSelectionUniformData uniformBuffer;
+            mSelectedCoord.x = mSelectedCoord.y = -1;
+            uniformBuffer.miSelectionX = mSelectedCoord.x;
+            uniformBuffer.miSelectionY = mSelectedCoord.y;
+            uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
+
+            printf("uniform selected mesh = %d\n", uniformBuffer.miSelectedMesh);
+            mpDevice->GetQueue().WriteBuffer(
+                maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
+                0,
+                &uniformBuffer,
+                sizeof(MeshSelectionUniformData)
+            );
+
+            printf("updated mesh selection uniform\n");
+
+#endif // __EMSCRIPTEN__
+        }
+
         // add commands from the render jobs
         std::vector<wgpu::CommandBuffer> aCommandBuffer;
         for(auto const& renderJobName : maOrderedRenderJobs)
@@ -525,7 +562,8 @@ namespace Render
 
             wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
             aCommandBuffer.push_back(commandBuffer);
-        }
+
+        }   // for all render jobs
 
         // get selection info from shader via read back buffer
         if(mbWaitingForMeshSelection)
@@ -538,11 +576,14 @@ namespace Render
                 0,
                 mOutputImageBuffer,
                 0,
-                256
+                64
             );
 
             wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
             aCommandBuffer.push_back(commandBuffer);
+
+            printf("copy selection buffer\n");
+            mbSelectedBufferCopied = true;
         }
 
         // submit all the job commands
@@ -550,15 +591,31 @@ namespace Render
             (uint32_t)aCommandBuffer.size(), 
             aCommandBuffer.data());
 
+#if defined(__EMSCRIPTEN__)
+        
+        static bool bQueueDone;
+        bQueueDone = false;
+        auto callBack = [](WGPUQueueWorkDoneStatus status, void* pUserData)
+        {
+            if(status == WGPUQueueWorkDoneStatus_Success)
+            {
+               bQueueDone = true;
+            }
+        };
+        mpDevice->GetQueue().OnSubmittedWorkDone(callBack, nullptr);
+
+        uint32_t iWait = 0;
+        while(bQueueDone == false)
+        {
+            emscripten_sleep(10);
+        }
+#endif // __EMSCRIPTEN__
+
+
         // mouse selection state, get the selected mesh from the shader
         if(mbWaitingForMeshSelection)
         {
-#if defined(__EMSCRIPTEN__)
-            SelectMeshInfo const* pInfo = (SelectMeshInfo const*)mOutputImageBuffer.GetConstMappedRange();
-            memcpy(&mSelectMeshInfo, pInfo, sizeof(SelectMeshInfo));
-            mSelectMeshInfo.miMeshID -= 1;
-            mOutputImageBuffer.Unmap();
-#else
+#if !defined(__EMSCRIPTEN__)
             auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
             {
                 if(status == wgpu::MapAsyncStatus::Success)
@@ -593,7 +650,8 @@ namespace Render
             };
 
             // read back mesh selection buffer from shader
-            uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
+            //uint32_t iFileSize = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
+            uint32_t iFileSize = sizeof(SelectMeshInfo);
             wgpu::Future future = mOutputImageBuffer.MapAsync(
                 wgpu::MapMode::Read,
                 0,
@@ -835,22 +893,76 @@ namespace Render
 
         mSelectedCoord = int2(iX, iY);
         mSelectMeshInfo.miMeshID = 0;
-
-        if(mOutputImageBuffer.Get() == nullptr)
-        {
-            wgpu::BufferDescriptor desc = {};
-            desc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
-            desc.size = mCreateDesc.miScreenWidth * mCreateDesc.miScreenHeight * sizeof(float4);
-            mOutputImageBuffer = mpDevice->CreateBuffer(&desc);
-        }
     }
 
     /*
     **
     */
-    Render::CRenderer::SelectMeshInfo const& CRenderer::getSelectionInfo()
+    CRenderer::SelectMeshInfo const& CRenderer::getSelectionInfo()
     {
         return mSelectMeshInfo;
     }
+
+    /*
+    **
+    */
+    void CRenderer::readBackBuffer()
+    {
+#if defined(__EMSCRIPTEN__)
+        printf("start read buffer\n");
+
+        static bool bMapped;
+        bMapped = false;
+
+        struct UserData
+        {
+            wgpu::Buffer* mpSrcBuffer;
+            void* mpDstBuffer;
+        };
+
+        UserData userData = {};
+        userData.mpSrcBuffer = &mOutputImageBuffer;
+        userData.mpDstBuffer = &mSelectMeshInfo;
+
+        mSelectMeshInfo.miMeshID = -1;
+
+        wgpu::BufferMapCallback callBack = [](WGPUBufferMapAsyncStatus status, void* userData)
+        {    
+            printf("call back from mapped buffer status: %d\n", status);
+            if(status == WGPUBufferMapAsyncStatus_Success)
+            {
+                printf("\tsuccess\n");
+                int32_t* pData = (int32_t*)userData;
+                for(uint32_t i = 0; i < 4; i++)
+                {
+                    printf("%d c = %d\n", i, *(pData + i));
+                }
+
+                UserData* pSelectionData = (UserData*)userData;
+
+                wgpu::BufferMapState mapState = ((wgpu::Buffer*)pSelectionData->mpSrcBuffer)->GetMapState();
+                printf("mapState = %d\n", mapState);
+
+                SelectMeshInfo const* pReadBackData = (SelectMeshInfo const*)pSelectionData->mpSrcBuffer->GetConstMappedRange();
+                memcpy(pSelectionData->mpDstBuffer, pReadBackData, sizeof(SelectMeshInfo));
+                bMapped = true;
+            }
+            
+        };
+        mOutputImageBuffer.MapAsync(wgpu::MapMode::Read, 0, sizeof(SelectMeshInfo), callBack, &userData);
+
+        //void const* pData = mOutputImageBuffer.GetConstMappedRange();
+
+        while(bMapped == false)
+        {
+            emscripten_sleep(10);
+        }
+
+        mOutputImageBuffer.Unmap();
+        mOutputImageBuffer.Destroy();
+
+        printf("!!! done reading back from buffer frame: %d !!!\n", miFrame);
+    }
+#endif // __EMSCRIPTEN__
 
 }   // Render
