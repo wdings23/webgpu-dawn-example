@@ -436,22 +436,6 @@ namespace Render
             mCaptureUniformBufferName = "";
             mbWaitingForMeshSelection = false;
             mbSelectedBufferCopied = false;
-            
-            MeshSelectionUniformData uniformBuffer;
-            mSelectedCoord.x = mSelectedCoord.y = -1;
-            uniformBuffer.miSelectionX = mSelectedCoord.x;
-            uniformBuffer.miSelectionY = mSelectedCoord.y;
-            uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
-
-            printf("uniform selected mesh = %d\n", uniformBuffer.miSelectedMesh);
-            mpDevice->GetQueue().WriteBuffer(
-                maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
-                0,
-                &uniformBuffer,
-                sizeof(MeshSelectionUniformData)
-            );
-
-            printf("updated mesh selection uniform\n");
 #else 
             auto callBack = [&](wgpu::MapAsyncStatus status, const char* message)
             {
@@ -496,6 +480,8 @@ namespace Render
             assert(mpInstance);
             mpInstance->WaitAny(future, UINT64_MAX);
 
+#endif // __EMSCRIPTEN__
+
             MeshSelectionUniformData uniformBuffer;
             mSelectedCoord.x = mSelectedCoord.y = -1;
             uniformBuffer.miSelectionX = mSelectedCoord.x;
@@ -507,9 +493,10 @@ namespace Render
                 maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
                 0,
                 &uniformBuffer,
-                sizeof(MeshSelectionUniformData));
+                sizeof(MeshSelectionUniformData)
+            );
+            printf("updated mesh selection uniform\n");
 
-#endif // __EMSCRIPTEN__
         }
 
         // add commands from the render jobs
