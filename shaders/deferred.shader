@@ -125,7 +125,7 @@ fn vs_main(in: VertexInput,
     var worldPosition: vec4<f32> = vec4<f32>(
         in.worldPosition.x,
         in.worldPosition.y,
-        in.worldPosition.z + (totalCenter.z - midPt.z) * max(uniformBuffer.mfExplodeMultiplier, 0.0f),
+        in.worldPosition.z - (totalCenter.z - midPt.z) * max(uniformBuffer.mfExplodeMultiplier, 0.0f),
         1.0f
     );
     out.pos = worldPosition * defaultUniformBuffer.mJitteredViewProjectionMatrix;
