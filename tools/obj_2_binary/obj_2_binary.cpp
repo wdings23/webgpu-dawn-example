@@ -10,17 +10,17 @@
 
 #include <filesystem>
 
-#include "vec.h"
-#include "LogPrint.h"
+#include <math/vec.h>
+#include <utils/LogPrint.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <stb_image/stb_image.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include <stb_image/stb_image_write.h>
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
+#include <tiny_obj_loader/tiny_obj_loader.h>
 
 #define POSITION_MULT 10.0
 
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
                     totalMinPos = fminf(totalMinPos, float3(vx, vy, vz));
                     totalMaxPos = fmaxf(totalMaxPos, float3(vx, vy, vz));
 
-                    std::string mapString = encodeToMapString(vertex, s);
+                    std::string mapString = encodeToMapString(vertex, (uint32_t)s);
                     auto iter = aTotalVertexMap.find(mapString);
                     if(iter == aTotalVertexMap.end())
                     {
