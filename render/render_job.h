@@ -45,6 +45,7 @@ namespace Render
 
 		void createWithOnlyOutputAttachments(CreateInfo& createInfo);
 		void createWithInputAttachmentsAndPipeline(CreateInfo& createInfo);
+		void setCopyAttachments(CreateInfo& createInfo);
 
 	protected:
 		wgpu::SurfaceTexture* mpSwapChain;

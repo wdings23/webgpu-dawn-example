@@ -67,6 +67,7 @@ float3 gInitialCameraLookAt(0.0f, 0.0f, 0.0f);
 
 std::vector<int32_t> aiHiddenMeshes;
 std::vector<uint32_t> aiVisibilityFlags;
+std::vector<float2> gaHaltonSequence;
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -81,6 +82,8 @@ void handleCameraMousePan(
     int32_t iLastY);
 
 void zoomToSelection();
+
+float2 get_jitter_offset(int frame_index, int width, int height);
 
 /*
 **
@@ -244,6 +247,10 @@ void render()
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
     cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
+    cameraInfo.mProjectionJitter = float2(
+        gaHaltonSequence[gRenderer.getFrameIndex() % 32].x,
+        gaHaltonSequence[gRenderer.getFrameIndex() % 32].y
+    );
 
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
@@ -318,6 +325,12 @@ void start()
     if(!glfwInit()) 
     {
         return;
+    }
+
+    gaHaltonSequence.resize(32);
+    for(uint32_t i = 0; i < 32; i++)
+    {
+        gaHaltonSequence[i] = get_jitter_offset(i, 30, 30);
     }
 
     gCameraLookAt = gInitialCameraLookAt;
@@ -711,6 +724,7 @@ int main()
     wgpu::RequestAdapterOptions adapterOptions = {};
     adapterOptions.backendType = wgpu::BackendType::Vulkan;
     adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
+    adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
 
     wgpu::Future future = instance.RequestAdapter(
         &adapterOptions,
@@ -991,3 +1005,27 @@ void zoomToSelection()
     }
 }
 
+float halton(int index, int base) 
+{
+    float f = 1.0f;
+    float r = 0.0f;
+    while(index > 0) {
+        f = f / base;
+        r = r + f * (index % base);
+        index = index / base;
+    }
+    return r;
+}
+float2 halton_2d(int index) 
+{
+    return float2(halton(index, 2), halton(index, 3));
+}
+
+float2 get_jitter_offset(int frame_index, int width, int height) 
+{
+    float2 halton_sample = halton_2d(frame_index);
+    // Scale and translate to center around pixel center and limit to pixel range
+    float x = ((halton_sample.x - 0.5f) / width) * 2.0f;
+    float y = ((halton_sample.y - 0.5f) / height) * 2.0f;
+    return float2(x, y);
+}

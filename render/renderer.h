@@ -86,6 +86,11 @@ namespace Render
             maiVisibilityFlags = piVisibilityFlags;
         }
 
+        inline uint32_t getFrameIndex()
+        {
+            return miFrame;
+        }
+
     public:
         struct MeshExtent
         {

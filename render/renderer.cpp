@@ -609,6 +609,35 @@ namespace Render
                 computePassEncoder.PopDebugGroup();
                 computePassEncoder.End();
             }
+            else if(pRenderJob->mType == Render::JobType::Copy)
+            {
+                commandEncoder.PushDebugGroup(pRenderJob->mName.c_str());
+                for(auto const& keyValue : pRenderJob->mInputImageAttachments)
+                {
+                    wgpu::TexelCopyTextureInfo srcInfo = {};
+                    srcInfo.texture = *keyValue.second;
+                    srcInfo.aspect = wgpu::TextureAspect::All;
+                    srcInfo.mipLevel = 0;
+                    srcInfo.origin.x = 0;
+                    srcInfo.origin.y = 0;
+                    srcInfo.origin.z = 0;
+
+                    wgpu::TexelCopyTextureInfo dstInfo = {};
+                    dstInfo.texture = pRenderJob->mOutputImageAttachments[keyValue.first];
+                    dstInfo.aspect = wgpu::TextureAspect::All;
+                    dstInfo.mipLevel = 0;
+                    dstInfo.origin.x = 0;
+                    dstInfo.origin.y = 0;
+                    dstInfo.origin.z = 0;
+                    
+                    wgpu::Extent3D copySize = {};
+                    copySize.depthOrArrayLayers = 1;
+                    copySize.width = srcInfo.texture.GetWidth();
+                    copySize.height = srcInfo.texture.GetHeight();
+                    commandEncoder.CopyTextureToTexture(&srcInfo, &dstInfo, &copySize);
+                }
+                commandEncoder.PopDebugGroup();
+            }
 
             wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
             aCommandBuffer.push_back(commandBuffer);
@@ -701,6 +730,10 @@ namespace Render
             {
                 createInfo.mJobType = Render::JobType::Compute;
             }
+            else if(jobType == "Copy")
+            {
+                createInfo.mJobType = Render::JobType::Copy;
+            }
 
             maOrderedRenderJobs.push_back(createInfo.mName);
 
@@ -728,6 +761,10 @@ namespace Render
             else if(passStr == "Depth Prepass")
             {
                 createInfo.mPassType = Render::PassType::DepthPrepass;
+            }
+            else if(passStr == "Copy")
+            {
+                createInfo.mPassType = Render::PassType::Copy;
             }
 
             createInfo.mpDevice = mpDevice;
@@ -771,7 +808,15 @@ namespace Render
             createInfo.mJobType = maRenderJobs[renderJobName]->mType;
             createInfo.mPassType = maRenderJobs[renderJobName]->mPassType;
             createInfo.mPipelineFilePath = aShaderModuleFilePath[iIndex];
-            maRenderJobs[renderJobName]->createWithInputAttachmentsAndPipeline(createInfo);
+
+            if(maRenderJobs[renderJobName]->mType == Render::JobType::Copy)
+            {
+                maRenderJobs[renderJobName]->setCopyAttachments(createInfo);
+            }
+            else
+            {
+                maRenderJobs[renderJobName]->createWithInputAttachmentsAndPipeline(createInfo);
+            }
             ++iIndex;
         }
 

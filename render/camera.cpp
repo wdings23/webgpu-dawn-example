@@ -55,6 +55,8 @@ void CCamera::update(CameraUpdateInfo& info)
     mViewProjectionMatrix = mProjectionMatrix * mViewMatrix;
     mJitterViewProjectionMatrix = mJitterProjectionMatrix * mViewMatrix;
 
+mViewProjectionMatrix = mJitterViewProjectionMatrix;
+
     float fAspectRatio = 1.0f;
     float fTan = (float)tan(info.mfFieldOfView * 0.25f);
     float fNearHeight = mfNear * fTan;

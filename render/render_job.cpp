@@ -87,6 +87,11 @@ namespace Render
                     wgpu::TextureUsage::StorageBinding;
                 textureDescriptor.viewFormatCount = 1;
 
+                if(mType == Render::JobType::Copy)
+                {
+                    textureDescriptor.usage |= wgpu::TextureUsage::CopyDst;
+                }
+
                 mOutputImageAttachments[attachmentName] = createInfo.mpDevice->CreateTexture(&textureDescriptor);
 
                 // save format
@@ -140,6 +145,11 @@ namespace Render
             {
                 mAttachmentOrder.push_back(std::make_pair(attachmentName, std::make_pair(attachmentType, "parentFormat")));
             }
+        }
+
+        if(mType == Render::JobType::Copy)
+        {
+            return;
         }
 
         auto const& aShaderResources = doc["ShaderResources"].GetArray();
@@ -283,6 +293,71 @@ namespace Render
                 {
                     mStoreOp = wgpu::StoreOp::Discard;
                 }
+            }
+        }
+    }
+
+    /*
+    **
+    */
+    void CRenderJob::setCopyAttachments(CreateInfo& createInfo)
+    {
+#if defined(__EMSCRIPTEN__)
+        char* acFileContent = nullptr;
+        Loader::loadFile(
+            &acFileContent,
+            createInfo.mPipelineFilePath,
+            true
+        );
+#else 
+        std::vector<char> acFileContent;
+        Loader::loadFile(
+            acFileContent,
+            createInfo.mPipelineFilePath,
+            true
+        );
+#endif // __EMSCRIPTEN__
+
+        rapidjson::Document doc;
+        {
+#if defined(__EMSCRIPTEN__)
+            doc.Parse(acFileContent);
+            Loader::loadFileFree(acFileContent);
+
+            printf("parse json \"%s\"\n", createInfo.mPipelineFilePath.c_str());
+#else
+            doc.Parse(acFileContent.data());
+#endif // __EMSCRIPTEN__
+        }
+
+        std::vector<Render::CRenderJob*>& apRenderJobs = *(createInfo.mpaRenderJobs);
+
+        auto const& attachments = doc["Attachments"].GetArray();
+        for(auto const& attachment : attachments)
+        {
+            std::string attachmentName = attachment["Name"].GetString();
+            std::string attachmentType = attachment["Type"].GetString();
+
+            if(attachmentType == "TextureOutput")
+            {
+                std::string parentJobName = attachment["ParentJobName"].GetString();
+                std::string parentName = attachment["ParentName"].GetString();
+
+                // get parent render job
+                auto iter = std::find_if(
+                    apRenderJobs.begin(),
+                    apRenderJobs.end(),
+                    [&](Render::CRenderJob* pRenderJob)
+                    {
+                        return pRenderJob->mName == parentJobName;
+                    });
+                assert(iter != apRenderJobs.end());
+
+                // get image input attachment from parent output attachment
+                Render::CRenderJob* pParentRenderJob = *iter;
+                assert(pParentRenderJob->mOutputImageAttachments.find(parentName) != pParentRenderJob->mOutputImageAttachments.end());
+                auto parentOutputAttachment = pParentRenderJob->mOutputImageAttachments.find(parentName);
+                mInputImageAttachments[attachmentName] = &parentOutputAttachment->second;
             }
         }
     }
