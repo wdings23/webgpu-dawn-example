@@ -68,7 +68,7 @@ struct UniformData
 @group(1) @binding(1) var<storage, read> aMeshTriangleIndexRanges: array<Range>;
 @group(1) @binding(2) var<storage, read> aMeshExtents: array<MeshExtent>;
 @group(1) @binding(3) var<storage, read> aiVisibleFlags: array<u32>;
-@group(1) @binding(4) var<uniform> defaultUniformData: DefaultUniformData;
+@group(1) @binding(4) var<uniform> defaultUniformBuffer: DefaultUniformData;
 
 const iNumThreads = 256u;
 
@@ -96,13 +96,20 @@ fn cs_main(
         return;
     }
     
-
-    let center: vec3f = (aMeshExtents[iMesh].mMaxPosition.xyz + aMeshExtents[iMesh].mMinPosition.xyz) * 0.5f;
+    // total mesh extent is at the very end of list
+    let totalMeshExtent: MeshExtent = aMeshExtents[defaultUniformBuffer.miNumMeshes];
+    let totalCenter: vec3f = (totalMeshExtent.mMaxPosition.xyz + totalMeshExtent.mMinPosition.xyz) * 0.5f;
 
     let uv: vec2f = vec2f(0.0f, 0.0f);
     
-    let minPos: vec3f = aMeshExtents[iMesh].mMinPosition.xyz + center.z * max(uniformBuffer.mfExplodeMultiplier, 1.0f);
-    let maxPos: vec3f = aMeshExtents[iMesh].mMaxPosition.xyz + center.z * max(uniformBuffer.mfExplodeMultiplier, 1.0f);
+    var minPos: vec3f = aMeshExtents[iMesh].mMinPosition.xyz;
+    var maxPos: vec3f = aMeshExtents[iMesh].mMaxPosition.xyz;
+    let meshCenter = (maxPos + minPos) * 0.5f;
+
+    let fOffsetZ: f32 = (totalCenter.z - meshCenter.z) * max(uniformBuffer.mfExplodeMultiplier, 0.0f);
+
+    minPos.z -= fOffsetZ;
+    maxPos.z -= fOffsetZ;
 
     // check bbox against the depth pyramid
     let bOccluded: bool = cullBBoxDepth(
@@ -116,21 +123,18 @@ fn cs_main(
         maxPos,
         iMesh);    
 
-    var xformCenter: vec4f = vec4f(center.xyz, 1.0f) * defaultUniformData.mViewProjectionMatrix;
-    xformCenter.x /= xformCenter.w;
-    xformCenter.y /= xformCenter.w;
-    xformCenter.z /= xformCenter.w;
-
-    if(xformCenter.x >= -1.0f && xformCenter.x <= 1.0f && xformCenter.y >= -1.0f && xformCenter.x <= 1.0f)
-    {
-        bInside = true;
-    }
-    else 
-    {
-        bInside = false;
-    }
-
-bInside = true;
+    //var xformCenter: vec4f = vec4f(center.xyz, 1.0f) * defaultUniformBuffer.mViewProjectionMatrix;
+    //xformCenter.x /= xformCenter.w;
+    //xformCenter.y /= xformCenter.w;
+    //xformCenter.z /= xformCenter.w;
+    //if(xformCenter.x >= -1.0f && xformCenter.x <= 1.0f && xformCenter.y >= -1.0f && xformCenter.x <= 1.0f)
+    //{
+    //    bInside = true;
+    //}
+    //else 
+    //{
+    //    bInside = false;
+    //}
 
     aiVisibleMeshID[iMesh] = 0u;
 
@@ -161,10 +165,10 @@ fn getFrustumPlane(
     fMult: f32) -> vec4f
 {
     var plane: vec3f = vec3f(
-        defaultUniformData.mViewProjectionMatrix[iColumn][0] * fMult + defaultUniformData.mViewProjectionMatrix[3][0],
-        defaultUniformData.mViewProjectionMatrix[iColumn][1] * fMult + defaultUniformData.mViewProjectionMatrix[3][1],
-        defaultUniformData.mViewProjectionMatrix[iColumn][2] * fMult + defaultUniformData.mViewProjectionMatrix[3][2]);
-    let fPlaneW: f32 = defaultUniformData.mViewProjectionMatrix[iColumn][3] * fMult + defaultUniformData.mViewProjectionMatrix[3][3];
+        defaultUniformBuffer.mViewProjectionMatrix[iColumn][0] * fMult + defaultUniformBuffer.mViewProjectionMatrix[3][0],
+        defaultUniformBuffer.mViewProjectionMatrix[iColumn][1] * fMult + defaultUniformBuffer.mViewProjectionMatrix[3][1],
+        defaultUniformBuffer.mViewProjectionMatrix[iColumn][2] * fMult + defaultUniformBuffer.mViewProjectionMatrix[3][2]);
+    let fPlaneW: f32 = defaultUniformBuffer.mViewProjectionMatrix[iColumn][3] * fMult + defaultUniformBuffer.mViewProjectionMatrix[3][3];
     let fLength: f32 = length(plane);
     plane = normalize(plane);
     
@@ -275,15 +279,15 @@ fn cullBBoxDepth(
     //let v6: vec3f = vec3f(minPosition.x, maxPosition.y, maxPosition.z);
     //let v7: vec3f = vec3f(maxPosition.x, maxPosition.y, maxPosition.z);
 //
-    //let xform0: vec4f = vec4f(v0.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform1: vec4f = vec4f(v1.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform2: vec4f = vec4f(v2.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform3: vec4f = vec4f(v3.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
+    //let xform0: vec4f = vec4f(v0.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform1: vec4f = vec4f(v1.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform2: vec4f = vec4f(v2.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform3: vec4f = vec4f(v3.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
 //
-    //let xform4: vec4f = vec4f(v4.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform5: vec4f = vec4f(v5.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform6: vec4f = vec4f(v6.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
-    //let xform7: vec4f = vec4f(v7.xyz, 1.0f) * defaultUniformData.mJitteredViewProjectionMatrix;
+    //let xform4: vec4f = vec4f(v4.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform5: vec4f = vec4f(v5.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform6: vec4f = vec4f(v6.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
+    //let xform7: vec4f = vec4f(v7.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
 //
     //let xyz0:vec3f  = xform0.xyz / xform0.w;
     //let xyz1:vec3f  = xform1.xyz / xform1.w;
@@ -311,7 +315,7 @@ fn cullBBoxDepth(
     //}
 //
     //let fMinDepth: f32 = minXYZ.z;
-    //let fAspectRatio: f32 = f32(defaultUniformData.miScreenHeight) / f32(defaultUniformData.miScreenWidth);
+    //let fAspectRatio: f32 = f32(defaultUniformBuffer.miScreenHeight) / f32(defaultUniformBuffer.miScreenWidth);
     //let diffXY: vec2f = abs(maxXYZ.xy - minXYZ.xy);
     //let fMaxComp: f32 = max(diffXY.x, diffXY.y * fAspectRatio) * 512.0f; // compute LOD from 1 to 8
     //let iLOD: u32 = min(u32(log2(fMaxComp)), 8u);
