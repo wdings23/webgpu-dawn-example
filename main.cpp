@@ -681,6 +681,7 @@ int main()
     wgpu::RequiredLimits requiredLimits = {};
     requiredLimits.limits.maxBufferSize = 400000000;
     requiredLimits.limits.maxStorageBufferBindingSize = 400000000;
+    requiredLimits.limits.maxColorAttachmentBytesPerSample = 64;
     wgpu::DeviceDescriptor deviceDesc = {};
     deviceDesc.requiredLimits = &requiredLimits;
     adapter.RequestDevice(
@@ -746,6 +747,7 @@ int main()
     wgpu::Limits requireLimits = {};
     requireLimits.maxBufferSize = 1000000000;
     requireLimits.maxStorageBufferBindingSize = 1000000000;
+    requireLimits.maxColorAttachmentBytesPerSample = 64;
 
     wgpu::DawnTogglesDescriptor toggleDesc = {};
     toggleDesc.enabledToggles = (const char* const*)&aszToggleNames;

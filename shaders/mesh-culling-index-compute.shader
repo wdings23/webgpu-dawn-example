@@ -90,7 +90,7 @@ fn cs_main(
         aDrawCalls[iMesh].miIndexCount = 0u;
         aDrawCalls[iMesh].miInstanceCount = 0u;
         aDrawCalls[iMesh].miFirstIndex = 0u;
-        aDrawCalls[iMesh].miBaseVertex = 0u;
+        aDrawCalls[iMesh].miBaseVertex = 0;
         aDrawCalls[iMesh].miFirstInstance = 0u;
 
         return;
