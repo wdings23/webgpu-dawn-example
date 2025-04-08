@@ -614,6 +614,24 @@ namespace Render
                 commandEncoder.PushDebugGroup(pRenderJob->mName.c_str());
                 for(auto const& keyValue : pRenderJob->mInputImageAttachments)
                 {
+#if defined(__EMSCRIPTEN__)
+                    wgpu::ImageCopyTexture srcInfo = {};
+                    srcInfo.texture = *keyValue.second;
+                    srcInfo.aspect = wgpu::TextureAspect::All;
+                    srcInfo.mipLevel = 0;
+                    srcInfo.origin.x = 0;
+                    srcInfo.origin.y = 0;
+                    srcInfo.origin.z = 0;
+
+                    wgpu::ImageCopyTexture dstInfo = {};
+                    dstInfo.texture = pRenderJob->mOutputImageAttachments[keyValue.first];
+                    dstInfo.aspect = wgpu::TextureAspect::All;
+                    dstInfo.mipLevel = 0;
+                    dstInfo.origin.x = 0;
+                    dstInfo.origin.y = 0;
+                    dstInfo.origin.z = 0;
+
+#else 
                     wgpu::TexelCopyTextureInfo srcInfo = {};
                     srcInfo.texture = *keyValue.second;
                     srcInfo.aspect = wgpu::TextureAspect::All;
@@ -629,6 +647,7 @@ namespace Render
                     dstInfo.origin.x = 0;
                     dstInfo.origin.y = 0;
                     dstInfo.origin.z = 0;
+#endif // __EMSCRIPTEN__
                     
                     wgpu::Extent3D copySize = {};
                     copySize.depthOrArrayLayers = 1;
@@ -827,9 +846,10 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
-        wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
-        assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
-        assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
+        wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
+        //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
+        //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
 
         return swapChainTexture;
     }

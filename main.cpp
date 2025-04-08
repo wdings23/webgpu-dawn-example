@@ -21,8 +21,8 @@ wgpu::RenderPipeline pipeline;
 
 wgpu::Surface surface;
 wgpu::TextureFormat format;
-const uint32_t kWidth = 512;
-const uint32_t kHeight = 512;
+const uint32_t kWidth = 1024;
+const uint32_t kHeight = 1024;
 
 struct UniformData
 {
@@ -248,8 +248,8 @@ void render()
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
     cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
     cameraInfo.mProjectionJitter = float2(
-        gaHaltonSequence[gRenderer.getFrameIndex() % 32].x,
-        gaHaltonSequence[gRenderer.getFrameIndex() % 32].y
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].x * 0.1f,
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.1f
     );
 
     gCamera.setLookAt(gCameraLookAt);
@@ -327,10 +327,10 @@ void start()
         return;
     }
 
-    gaHaltonSequence.resize(32);
-    for(uint32_t i = 0; i < 32; i++)
+    gaHaltonSequence.resize(64);
+    for(uint32_t i = 0; i < 64; i++)
     {
-        gaHaltonSequence[i] = get_jitter_offset(i, 30, 30);
+        gaHaltonSequence[i] = get_jitter_offset(i, 512, 512);
     }
 
     gCameraLookAt = gInitialCameraLookAt;
@@ -436,14 +436,14 @@ void start()
                 Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
                 if(selectionInfo.miMeshID >= 0)
                 {
-                    aiVisibilityFlags[selectionInfo.miMeshID - 2] = 0;
+                    aiVisibilityFlags[selectionInfo.miMeshID - 1] = 0;
                     gRenderer.setBufferData(
                         "visibilityFlags",
                         aiVisibilityFlags.data(),
                         0,
                         uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
                     );
-                    aiHiddenMeshes.push_back(selectionInfo.miMeshID - 2);
+                    aiHiddenMeshes.push_back(selectionInfo.miMeshID - 1);
                 }
                 break;
             }
@@ -991,7 +991,7 @@ void zoomToSelection()
             float fRadiusMult = 1.25f;
 
             //gCameraPosition = midPt + normalize(diff) * fRadius;
-            gCameraPosition = midPt + float3(0.0f, 0.0f, -1.0f) * (fRadius * fRadiusMult);
+            gCameraPosition = midPt + float3(0.0f, 0.0f, 1.0f) * (fRadius * fRadiusMult);
             gCameraLookAt = midPt;
 
             gInitialCameraPosition = gCameraPosition;
@@ -999,7 +999,7 @@ void zoomToSelection()
 
             gCameraAngle = float2(0.0f, 0.0f);
 
-            toggleOtherVisibilityFlags(selectMeshInfo.miMeshID - 2, false);
+            toggleOtherVisibilityFlags(selectMeshInfo.miMeshID - 1, false);
             gRenderer.setExplosionMultiplier(0.0f);
         }
     }

@@ -17,7 +17,18 @@
             "Name" : "Material Output",
             "Type": "TextureOutput",
             "Format": "rgba16float"
+        },
+        {
+            "Name" : "Texture Coordinate And Clip Space Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
+        },
+        {
+            "Name" : "Motion Vector Output",
+            "Type": "TextureOutput",
+            "Format": "rgba16float"
         }
+        
     ],
     "ShaderResources": [
         { 

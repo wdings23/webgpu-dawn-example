@@ -152,49 +152,52 @@ namespace Render
             return;
         }
 
-        auto const& aShaderResources = doc["ShaderResources"].GetArray();
-        for(auto const& shaderResource : aShaderResources)
+        if(doc.HasMember("ShaderResources"))
         {
-            std::string shaderResourceName = shaderResource["name"].GetString();
-            std::string shaderResourceType = shaderResource["type"].GetString();
-            std::string shaderUsage = shaderResource["usage"].GetString();
-            if(shaderResourceType == "buffer")
+            auto const& aShaderResources = doc["ShaderResources"].GetArray();
+            for(auto const& shaderResource : aShaderResources)
             {
-                uint32_t iSize = 0;
-                if(shaderResource.HasMember("size") || shaderResource.HasMember("external") == false)
+                std::string shaderResourceName = shaderResource["name"].GetString();
+                std::string shaderResourceType = shaderResource["type"].GetString();
+                std::string shaderUsage = shaderResource["usage"].GetString();
+                if(shaderResourceType == "buffer")
                 {
-                    iSize = shaderResource["size"].GetUint();
+                    uint32_t iSize = 0;
+                    if(shaderResource.HasMember("size") || shaderResource.HasMember("external") == false)
+                    {
+                        iSize = shaderResource["size"].GetUint();
 
-                    std::string shaderStage = shaderResource["shader_stage"].GetString();
-                    
-                    wgpu::BufferDescriptor bufferDesc = {};
-                    bufferDesc.label = shaderResourceName.c_str();
-                    bufferDesc.size = iSize;
-                    if(shaderUsage == "read_only_storage")
-                    {
-                        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+                        std::string shaderStage = shaderResource["shader_stage"].GetString();
+
+                        wgpu::BufferDescriptor bufferDesc = {};
+                        bufferDesc.label = shaderResourceName.c_str();
+                        bufferDesc.size = iSize;
+                        if(shaderUsage == "read_only_storage")
+                        {
+                            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+                        }
+                        else if(shaderUsage == "uniform")
+                        {
+                            bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+                        }
+                        else if(shaderUsage == "read_write_storage")
+                        {
+                            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+                        }
+
+                        mUniformBuffers[shaderResourceName] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
                     }
-                    else if(shaderUsage == "uniform")
+                    else
                     {
-                        bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+                        uint32_t iBufferSize = 0;
+                        mUniformBuffers[shaderResourceName] = createInfo.mpfnGetBuffer(iBufferSize, shaderResourceName, createInfo.mpUserData);
                     }
-                    else if(shaderUsage == "read_write_storage")
-                    {
-                        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
-                    }
-                    
-                    mUniformBuffers[shaderResourceName] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
                 }
-                else
-                {
-                    uint32_t iBufferSize = 0;
-                    mUniformBuffers[shaderResourceName] = createInfo.mpfnGetBuffer(iBufferSize, shaderResourceName, createInfo.mpUserData);
-                }
-            }
 
-            mUniformOrder.push_back(std::make_pair(shaderResourceName, std::make_pair(shaderResourceType, shaderUsage)));
+                mUniformOrder.push_back(std::make_pair(shaderResourceName, std::make_pair(shaderResourceType, shaderUsage)));
 
-        }   // for shader
+            }   // for shader
+        }
 
         if(doc.HasMember("DepthStencilState"))
         {

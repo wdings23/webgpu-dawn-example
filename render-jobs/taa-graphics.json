@@ -1,0 +1,58 @@
+{
+    "Type": "Graphics",
+    "PassType": "Full Triangle",
+    "Shader": "taa-graphics.shader",
+    "Attachments": [
+        {
+            "Name" : "TAA Output",
+            "Type": "TextureOutput",
+            "Format": "rgba32float"
+        },
+        
+        {
+            "Name" : "World Position Output",
+            "Type": "TextureInput",
+            "ParentJob": "Deferred Indirect Graphics"
+        },
+        {
+            "Name" : "Selection Output",
+            "Type": "TextureInput",
+            "ParentJob": "Mesh Selection Graphics"
+        },
+        {
+            "Name" : "Previous Selection Output",
+            "Type": "TextureInput",
+            "ParentJob": "Copy Render Targets"
+        },
+        {
+            "Name" : "Motion Vector Output",
+            "Type": "TextureInput",
+            "ParentJob": "Deferred Indirect Graphics"
+        }
+    ],
+    "BlendStates": [
+        {
+            "Enabled": "False"
+        }
+    ],
+    "DepthStencilState":
+    {
+        "DepthEnable": "True",
+        "DepthWriteMask": "One",
+        "DepthFunc": "LessEqual",
+        "StencilEnable": "False"
+    },
+    "RasterState":
+    {
+        "FillMode": "Solid",
+        "CullMode": "None",
+        "FrontFace": "CounterClockwise"
+    },
+    "VertexFormat":
+    [
+        "Vec4",
+        "Vec4",
+        "Vec4"
+    ],
+    "UseGlobalTextures": "True"
+}

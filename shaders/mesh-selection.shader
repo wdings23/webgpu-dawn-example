@@ -124,8 +124,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
             aSelectedMeshes[0].miMeshID = i32(iMesh + 1);
             aSelectedMeshes[0].miSelectionX = iScreenCoordX;
             aSelectedMeshes[0].miSelectionY = iScreenCoordY;
-            aSelectedMeshes[0].mMinMeshPosition = aMeshExtents[iMesh-2].mMinPosition;
-            aSelectedMeshes[0].mMaxMeshPosition = aMeshExtents[iMesh-2].mMaxPosition;
+            aSelectedMeshes[0].mMinMeshPosition = aMeshExtents[iMesh-1].mMinPosition;
+            aSelectedMeshes[0].mMaxMeshPosition = aMeshExtents[iMesh-1].mMaxPosition;
         }
     }
 
@@ -137,8 +137,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     if(iMesh == -1)
     {
         let backGroundColor: vec3f = mix(vec3f(0.0f, 0.5f, 0.8f), vec3f(0.8f, 0.8f, 0.8f), in.uv.y);
-
-        out.mOutput = vec4f(backGroundColor, 1.0f);
+        out.mOutput = vec4f(backGroundColor, 0.0f);
     }
 
     return out;

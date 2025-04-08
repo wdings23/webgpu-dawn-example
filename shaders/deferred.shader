@@ -87,26 +87,27 @@ var<uniform> defaultUniformBuffer: DefaultUniformData;
 @group(1) @binding(6)
 var textureSampler: sampler;
 
-struct VertexInput {
+struct VertexInput 
+{
     @location(0) worldPosition : vec4<f32>,
     @location(1) texCoord: vec4<f32>,
     @location(2) normal : vec4<f32>
 };
-struct VertexOutput {
+struct VertexOutput 
+{
     @builtin(position) pos: vec4<f32>,
     @location(0) worldPosition: vec4<f32>,
     @location(1) texCoord: vec4<f32>,
     @location(2) normal: vec4<f32>
 };
-struct FragmentOutput {
+struct FragmentOutput 
+{
     @location(0) worldPosition : vec4<f32>,
-    //@location(1) texCoord : vec4<f32>,
     @location(1) normal: vec4<f32>,
-    //@location(3) motionVector: vec4<f32>,
-    //@location(2) clipSpace: vec4<f32>,
     @location(2) mMaterial: vec4<f32>,
+    @location(3) texCoordAndClipSpace: vec4<f32>,
+    @location(4) motionVector: vec4<f32>
 };
-
 
 @vertex
 fn vs_main(in: VertexInput,
@@ -173,7 +174,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         texCoord.y = fract(texCoord.y);
     }
 
-    //out.texCoord = vec4<f32>(texCoord.x, texCoord.y, 0.0f, 0.0f);
+    out.texCoordAndClipSpace.x = texCoord.x;
+    out.texCoordAndClipSpace.y = texCoord.y;
 
     // store depth and mesh id in worldPosition.w
     out.worldPosition.w = clamp(in.pos.z, 0.0f, 0.999f) + floor(in.worldPosition.w + 0.5f);
@@ -197,10 +199,13 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     vec3<f32>(0.5f);
     prevClipSpacePos.y = 1.0f - prevClipSpacePos.y;
 
-    //out.motionVector.x = (currClipSpacePos.x - prevClipSpacePos.x);
-    //out.motionVector.y = (currClipSpacePos.y - prevClipSpacePos.y);
-    //out.motionVector.z = floor(in.worldPosition.w + 0.5f);      // mesh id
-    //out.motionVector.w = currClipSpacePos.z;                    // depth
+    out.texCoordAndClipSpace.z = currClipSpacePos.x;
+    out.texCoordAndClipSpace.w = currClipSpacePos.y;
+
+    out.motionVector.x = (currClipSpacePos.x - prevClipSpacePos.x);
+    out.motionVector.y = (currClipSpacePos.y - prevClipSpacePos.y);
+    out.motionVector.z = floor(in.worldPosition.w + 0.5f);      // mesh id
+    out.motionVector.w = currClipSpacePos.z;                    // depth
 
     var xform: vec4<f32> = vec4<f32>(in.worldPosition.xyz, 1.0f) * defaultUniformBuffer.mJitteredViewProjectionMatrix;
     var fDepth: f32 = xform.z / xform.w;
@@ -212,9 +217,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     out.mMaterial = vec4f(aMaterials[iMesh].mDiffuse.xyz * fDP, 1.0f);
 
     // encode clip space 
-    out.worldPosition.w += currClipSpacePos.z;
-    out.normal.w = currClipSpacePos.x;
-    out.mMaterial.w = currClipSpacePos.y;
+    //out.worldPosition.w += currClipSpacePos.z;
+    out.normal.w = currClipSpacePos.z;
+    //out.mMaterial.w = currClipSpacePos.y;
 
     //out.texCoord.z = f32(iMesh);
 

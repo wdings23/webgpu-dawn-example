@@ -21,6 +21,12 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "TAA Graphics",
+            "Pipeline": "taa-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "Copy Render Targets",
             "Pipeline": "copy-render-targets.json",
             "Type": "Copy",

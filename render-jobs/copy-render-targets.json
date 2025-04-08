@@ -1,0 +1,14 @@
+{
+    "Type": "Copy",
+    "PassType": "Copy",
+    "Attachments": [
+        {
+            "Name": "Previous Selection Output",
+            "Type": "TextureOutput",
+            "ParentJobName": "Mesh Selection Graphics",
+            "ParentName": "Selection Output",
+            "Format": "rgba32float"
+        }
+    ]
+}
+        
