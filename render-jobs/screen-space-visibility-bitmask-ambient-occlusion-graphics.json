@@ -1,17 +1,10 @@
 {
     "Type": "Graphics",
     "PassType": "Full Triangle",
-    "Shader": "screen-space-visibility-bitmask-ambient-occlusion-graphics.shader",
+    "Shader": "screen-space-visiblity-bitmask-ambient-occlusion-graphics.shader",
     "Attachments": [
         {
             "Name": "Ambient Occlusion Output",
-            "Type": "TextureOutput",
-            "Format": "rgba32float",
-            "ScaleWidth": 1.0,
-            "ScaleHeight": 1.0
-        },
-        {
-            "Name": "Radiance Output",
             "Type": "TextureOutput",
             "Format": "rgba32float",
             "ScaleWidth": 1.0,
@@ -21,17 +14,17 @@
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJobName": "Deferred Indirect Graphics"
+            "ParentJob": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Normal Output",
             "Type": "TextureInput",
-            "ParentJobName": "Deferred Indirect Graphics"
+            "ParentJob": "Deferred Indirect Graphics"
         },
         {
-            "Name" : "Clip Space Output",
+            "Name" : "Texture Coordinate And Clip Space Output",
             "Type": "TextureInput",
-            "ParentJobName": "Deferred Indirect Graphics"
+            "ParentJob": "Deferred Indirect Graphics"
         }
     ],
     "ShaderResources": [

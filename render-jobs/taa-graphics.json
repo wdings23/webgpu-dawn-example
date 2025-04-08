@@ -15,9 +15,9 @@
             "ParentJob": "Deferred Indirect Graphics"
         },
         {
-            "Name" : "Selection Output",
+            "Name" : "Composite Output",
             "Type": "TextureInput",
-            "ParentJob": "Mesh Selection Graphics"
+            "ParentJob": "Composite Graphics"
         },
         {
             "Name" : "Previous TAA Output",

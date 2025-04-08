@@ -21,6 +21,18 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "Ambient Occlusion Graphics",
+            "Pipeline": "screen-space-visibility-bitmask-ambient-occlusion-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
+            "Name": "Composite Graphics",
+            "Pipeline": "composite-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "TAA Graphics",
             "Pipeline": "taa-graphics.json",
             "Type": "Graphics",

@@ -248,8 +248,8 @@ void render()
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
     cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
     cameraInfo.mProjectionJitter = float2(
-        gaHaltonSequence[gRenderer.getFrameIndex() % 64].x * 0.1f,
-        gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.1f
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].x * 0.25f,
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.25f
     );
 
     gCamera.setLookAt(gCameraLookAt);
@@ -752,7 +752,8 @@ int main()
     char const* aszToggleNames[] =
     {
         "use_user_defined_labels_in_backend",
-        "allow_unsafe_apis"
+        "allow_unsafe_apis",
+        "disable_symbol_renaming"
     };
     wgpu::FeatureName aFeatureNames[] =
     {
