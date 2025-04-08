@@ -146,7 +146,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         //clamp(prevRadiance, minRadiance, maxRadiance),
         clamp(totalPrevRadiance.xyz / fTotalPrevWeight, minRadiance, maxRadiance),
         //radiance.xyz,
-        totalRadiance / fTotalPrevWeight,
+        totalRadiance.xyz / fTotalPrevWeight,
         (1.0f / NUM_HISTORY)
     );
 

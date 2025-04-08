@@ -3,10 +3,10 @@
     "PassType": "Copy",
     "Attachments": [
         {
-            "Name": "Previous Selection Output",
+            "Name": "Previous TAA Output",
             "Type": "TextureOutput",
-            "ParentJobName": "Mesh Selection Graphics",
-            "ParentName": "Selection Output",
+            "ParentJobName": "TAA Graphics",
+            "ParentName": "TAA Output",
             "Format": "rgba32float"
         }
     ]

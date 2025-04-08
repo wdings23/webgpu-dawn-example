@@ -20,7 +20,7 @@
             "ParentJob": "Mesh Selection Graphics"
         },
         {
-            "Name" : "Previous Selection Output",
+            "Name" : "Previous TAA Output",
             "Type": "TextureInput",
             "ParentJob": "Copy Render Targets"
         },
