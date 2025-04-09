@@ -204,7 +204,8 @@ int main(int argc, char* argv[])
             &materials, 
             &warn, 
             &err, 
-            path.c_str());
+            path.c_str(),
+            directory.c_str());
 
         // Access loaded data
         for(size_t s = 0; s < shapes.size(); s++)
@@ -214,38 +215,40 @@ int main(int argc, char* argv[])
             aMeshNames.push_back(partNameStringStream.str());
 
             OBJMaterialInfo material = {};
-            if(materials.size() > s)
+            if(materials.size() > 0)
             {
+                int32_t iMaterialID = shapes[s].mesh.material_ids[0];
+
                 material.mDiffuse = float4(
-                    (float)materials[s].diffuse[0], 
-                    (float)materials[s].diffuse[0], 
-                    (float)materials[s].diffuse[0], 1.0f);
+                    (float)materials[iMaterialID].diffuse[0], 
+                    (float)materials[iMaterialID].diffuse[0], 
+                    (float)materials[iMaterialID].diffuse[0], 1.0f);
 
                 material.mSpecular = float4(
-                    (float)materials[s].specular[0],
-                    (float)materials[s].specular[0],
-                    (float)materials[s].specular[0], 1.0f);
+                    (float)materials[iMaterialID].specular[0],
+                    (float)materials[iMaterialID].specular[0],
+                    (float)materials[iMaterialID].specular[0], 1.0f);
 
                 material.mEmissive = float4(
-                    (float)materials[s].emission[0],
-                    (float)materials[s].emission[0],
-                    (float)materials[s].emission[0], 1.0f);
+                    (float)materials[iMaterialID].emission[0],
+                    (float)materials[iMaterialID].emission[0],
+                    (float)materials[iMaterialID].emission[0], 1.0f);
 
-                material.mAlbedoTexturePath = materials[s].diffuse_texname;
-                material.mEmissiveTexturePath = materials[s].emissive_texname;
-                material.mSpecularTexturePath = materials[s].specular_texname;
-                material.mNormalTexturePath = materials[s].normal_texname;
+                material.mAlbedoTexturePath = materials[iMaterialID].diffuse_texname;
+                material.mEmissiveTexturePath = materials[iMaterialID].emissive_texname;
+                material.mSpecularTexturePath = materials[iMaterialID].specular_texname;
+                material.mNormalTexturePath = materials[iMaterialID].normal_texname;
             }
-
-            if(s >= materials.size())
+            else 
             {
                 float fRed = float(rand() % 255) / 255.0f;
                 float fGreen = float(rand() % 255) / 255.0f;
                 float fBlue = float(rand() % 255) / 255.0f;
                 material.mDiffuse = float4(fRed, fGreen, fBlue, 1.0f);
-                aMeshMaterials.push_back(material);
-                aiMeshMaterialIDs.push_back((uint32_t)aMeshMaterials.size() - 1);
             }
+
+            aMeshMaterials.push_back(material);
+            aiMeshMaterialIDs.push_back((uint32_t)aMeshMaterials.size() - 1);
 
             std::vector<Vertex> aVertices;
             std::vector<uint32_t> aiVertexIndices;
@@ -359,12 +362,19 @@ int main(int argc, char* argv[])
                 
             }
 
+//if(s <= 10)
+//{
+//    break;
+//}
+
         }   // for shape = 0 to num shapes
     
         DEBUG_PRINTF("added \"%s\" num meshes %d total num meshes: %d\n", 
             baseName.c_str(), 
             shapes.size(),
             aMeshBBoxes.size());
+
+//break;
 
     }   // tiny obj
 
@@ -710,8 +720,8 @@ void test(
     aMeshRanges.resize(iNumMeshes);
     fread(aMeshRanges.data(), sizeof(MeshRange), iNumMeshes, fp);
 
-    aMeshExtents.resize(iNumMeshes);
-    fread(aMeshExtents.data(), sizeof(MeshExtent), iNumMeshes, fp);
+    aMeshExtents.resize(iNumMeshes + 1);            // last mesh extent is the overall mesh
+    fread(aMeshExtents.data(), sizeof(MeshExtent), iNumMeshes + 1, fp);
 
     aTotalVertices.resize(iNumTotalVertices);
     fread(aTotalVertices.data(), sizeof(Vertex), iNumTotalVertices, fp);
