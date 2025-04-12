@@ -16,7 +16,7 @@ struct VertexOutput
 };
 struct FragmentOutput 
 {
-    @location(0) ambientOcclusion: vec4<f32>,
+    @location(0) mAmbientOcclusion: vec4<f32>,
 };
 
 struct UniformData
@@ -78,13 +78,16 @@ var worldPositionTexture: texture_2d<f32>;
 var normalTexture: texture_2d<f32>;
 
 @group(0) @binding(2)
-var materialTexture: texture_2d<f32>;
+var textureCoordAndClipSpaceTexture: texture_2d<f32>;
+
+@group(0) @binding(3)
+var viewPositionTexture: texture_2d<f32>;
 
 @group(1) @binding(0)
 var<uniform> uniformData: UniformData;
 
 @group(1) @binding(1)
-var<uniform> defaultUniformData: DefaultUniformData;
+var<uniform> defaultUniformBuffer: DefaultUniformData;
 
 @group(1) @binding(2)
 var textureSampler: sampler;
@@ -104,167 +107,7 @@ fn vs_main(@builtin(vertex_index) i : u32) -> VertexOutput
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput 
 {
-    let kiNumSlices: i32 = 16;
-    let kfThickness: f32 = 0.1f;
-    let kiNumSectors: i32 = 32;
-    let kfMaxAOLength: f32 = 2.0f;
-
-    let aspect: vec2<f32> = vec2<f32>(f32(defaultUniformData.miScreenHeight), f32(defaultUniformData.miScreenWidth)) / f32(defaultUniformData.miScreenWidth);
-
-    var out: FragmentOutput;
-
-    let worldPosition: vec4<f32> = textureSample(
-        worldPositionTexture, 
-        textureSampler, 
-        in.uv);
-
-    let position: vec3<f32> = worldPosition.xyz;
-    if(worldPosition.w <= 0.0f)
-    {
-        out.ambientOcclusion = vec4<f32>(0.0f, 0.0f, 0.0f, 0.0f);
-    }
-
-    let normal: vec4<f32> = textureSample(
-        normalTexture, 
-        textureSampler, 
-        in.uv);
-    
-    ///////////////////////////////////////////////////////////
-
-    var fVisibility: f32 = 0.0f;
-
-    let material: vec4<f32> = textureSample(
-        materialTexture,
-        textureSampler,
-        in.uv
-    );
-
-    let clipSpace: vec3f = vec3f(normal.w, material.w, worldPosition.w);
-
-    // transform world position and normal to view space
-    let direction: vec3<f32> = normalize(-clipSpace.xyz);
-    var up: vec3<f32> = vec3<f32>(0.0f, 1.0f, 0.0f);
-    if(abs(direction.y) > 0.98f)
-    {
-        up = vec3<f32>(0.0f, 0.0f, 1.0f);
-    }
-    let tangent: vec3<f32> = normalize(cross(up, direction));
-    let binormal: vec3<f32> = normalize(cross(direction, tangent));
-    let viewClipSpace: vec3<f32> = vec3<f32>(
-        dot(clipSpace.xyz, tangent),
-        dot(clipSpace.xyz, binormal),
-        dot(clipSpace.xyz, direction),
-    );
-    let viewNormal: vec3<f32> = vec3<f32>(
-        dot(normal.xyz, tangent),
-        dot(normal.xyz, binormal),
-        dot(normal.xyz, direction)
-    );     
-
-    let fSampleRadius: f32 = 24.0f; // f32(kiNumSlices) * 0.5f;
-    let uvStep: vec2<f32> = vec2<f32>(
-        1.0f / f32(defaultUniformData.miScreenWidth), 
-        1.0f / f32(defaultUniformData.miScreenHeight)) * fSampleRadius;
-
-    let fAngleInc: f32 = PI / f32(kiNumSectors);
-    
-    var fNumHitSamples: f32 = 0.0f;
-    var fSampleCount: f32 = 0.0f;
-
-    var fAO: f32 = 0.0f;
-
-    let fAngleDiff: f32 = 2.0f;
-
-    var totalRadiance: vec3<f32> = vec3<f32>(0.0f, 0.0f, 0.0f);
-
-    // sample multiple hemispheres
-    for(var iSlice: i32 = 0; iSlice < kiNumSlices; iSlice++)
-    {
-        let fPhi: f32 = (f32(iSlice) / f32(kiNumSlices)) * PI;
-        let omega: vec2<f32> = vec2<f32>(cos(fPhi), sin(fPhi));
-
-        var iBitMask: u32 = 0u;
-        var iAOBitMask: u32 = 0u;
-        var iRadianceBitMask: u32 = 0u;
-        for(var iSector: i32 = -kiNumSectors / 2; iSector < kiNumSectors / 2; iSector++)
-        {
-            // sample view clip space position and normal
-            let sampleUV: vec2<f32> = in.uv.xy + omega * uvStep * (f32(iSector) / f32(kiNumSectors / 2));
-            let sampleNormal: vec4<f32> = textureSample(
-                normalTexture,
-                textureSampler,
-                sampleUV
-            );
-            let sampleWorldPosition: vec4<f32> = textureSample(
-                worldPositionTexture,
-                textureSampler,
-                sampleUV
-            );
-            let sampleMaterial: vec4<f32> = textureSample(
-                materialTexture,
-                textureSampler,
-                sampleUV
-            );
-
-            var sampleClipSpace: vec3<f32> = vec3<f32>(
-                sampleNormal.w, sampleMaterial.w, sampleWorldPosition.w  
-            );
-
-            let sampleViewClipSpace: vec3<f32> = vec3<f32>(
-                dot(sampleClipSpace, tangent),
-                dot(sampleClipSpace, binormal),
-                dot(sampleClipSpace, direction),
-            );
-            let sampleViewNormal: vec3<f32> = vec3<f32>(
-                dot(sampleNormal.xyz, tangent),
-                dot(sampleNormal.xyz, binormal),
-                dot(sampleNormal.xyz, direction)
-            );
-            
-            var iAOMult: u32 = 1u;
-            if(length(sampleWorldPosition.xyz - worldPosition.xyz) > kfMaxAOLength)
-            {
-                iAOMult = 0u;
-            }
-
-            let fClipSpaceLength: f32 = length(sampleViewClipSpace - viewClipSpace);
-            let sampleViewDiff: vec3<f32> = normalize((sampleViewClipSpace - viewClipSpace) + vec3<f32>(0.00001f, 0.0f, 0.0f));
-            let fWorldDiffLength: f32 = max(length(sampleWorldPosition.xyz - worldPosition.xyz), 1.0f);
-
-            let dir: vec3<f32> = vec3<f32>(0.0f, 0.0f, 1.0f);
-            var viewDir: vec3<f32> = vec3<f32>(0.0f, 0.0f, 1.0f);
-            
-            // front and back angles
-            let fAngle0: f32 = getAngle(
-                viewClipSpace, 
-                sampleViewClipSpace,
-                viewDir);
-            let fAngle1: f32 = clamp(fAngle0 - fAngleInc * kfThickness, 0.0f, PI);
-
-            let iAngle0: f32 = clamp(ceil((fAngle0 / PI) * f32(kiNumSectors)), 0.0f, 32.0f);
-            let iAngle1: f32 = clamp(iAngle0 - fAngleDiff, 0.0f, 32.0f);
-
-            let iSampleBitMask: u32 = ((u32(pow(2.0f, f32(iAngle0 - iAngle1))) - 1u) << u32(iAngle1));
-            let iSampleBitMaskAO: u32 = iSampleBitMask * iAOMult;
-
-            let origNormalDP: f32 = max(dot(viewNormal, sampleViewDiff), 0.0f);
-            let sampleNormalDP: f32 = max(dot(sampleViewNormal, -sampleViewDiff), 0.0f);
-
-            iAOBitMask = iAOBitMask | iSampleBitMaskAO;
-            iRadianceBitMask = iRadianceBitMask | iSampleBitMask;
-
-            fSampleCount += 1.0f;
-        }
-
-        fAO += 1.0f - f32(CountBits(iAOBitMask)) / f32(kiNumSectors);
-    }
-
-    fAO /= f32(kiNumSlices);
-    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
-    fAO = smoothstep(0.0f, 1.0f, fAO);
-
-    out.ambientOcclusion = vec4<f32>(fAO, fAO, fAO, 1.0f);
-    
+    var out: FragmentOutput = ao(in);
     return out;
 }
 
@@ -307,3 +150,155 @@ fn CountBits(val: u32) -> u32
     return iVal;
 }
 
+/////
+fn ao(in: VertexOutput) -> FragmentOutput
+{
+    var out: FragmentOutput;
+
+    let kiNumSections: u32 = 32u;
+    let kiNumSlices: u32 = 32u;
+    let kfThickness: f32 = 0.0001f;
+
+    var worldPosition: vec4f = textureSample(
+        worldPositionTexture, 
+        textureSampler, 
+        in.uv);
+
+    if(worldPosition.w <= 0.0f)
+    {
+        out.mAmbientOcclusion = vec4f(0.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    let normal: vec4f = textureSample(
+        normalTexture, 
+        textureSampler, 
+        in.uv);
+
+    var viewMatrix: mat4x4<f32> = defaultUniformBuffer.mViewMatrix;
+    viewMatrix[0] = vec4f(viewMatrix[0].xyz, 0.0f);
+    viewMatrix[1] = vec4f(viewMatrix[1].xyz, 0.0f);
+    viewMatrix[2] = vec4f(viewMatrix[2].xyz, 0.0f);
+    
+    let cameraPosition: vec3f = defaultUniformBuffer.mCameraPosition.xyz;
+    let viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
+    let fSampleRadius: f32 = 2.0f;
+
+    var textureSize: vec2u = textureDimensions(worldPositionTexture);
+    let uvStep: vec2f = vec2<f32>(
+        1.0f / f32(textureSize.x), 
+        1.0f / f32(textureSize.y)) * fSampleRadius;
+
+    let viewPosition: vec3f = worldPosition.xyz - cameraPosition;
+    let viewDirection: vec3f = normalize(viewPosition);
+
+    // sample multiple slices around the view direction
+    var iTotalBits: u32 = 0u;
+    var iCountedBits: u32 = 0u;
+    for(var iSlice: u32 = 0; iSlice < kiNumSlices; iSlice++)
+    {
+        // These steps are essentially for patitioning the middle of the slide to integrate over
+        // Get the cosine of projected view space normal to the slice and view direction by:
+        // 1) 2d direction in screen space of the slice
+        // 2) slice plane normal is thecross product of screen space direction and view direction
+        // 3) get the projected length of the view space normal to the slice plane normal to apply to the plane normal 
+        // 4) subtract the view space normal with projected plane normal to get the projected view space to slice normal
+        // 5) cosine of the view direction on the slice plane is the dot product of projected normal and view direction
+        let fPhi: f32 = f32(iSlice) * ((2.0f * PI) / f32(kiNumSlices));
+        let omega: vec2f = vec2f(cos(fPhi), sin(fPhi));
+        let screenSpaceDirection: vec3f =  vec3f(omega.x, omega.y, 0.0f);
+        let orthoDirection: vec3f = screenSpaceDirection - (viewDirection * dot(screenSpaceDirection, viewDirection));
+        let axis: vec3f = cross(viewDirection, orthoDirection);
+        let fProjectedLength: f32 = dot(viewSpaceNormal.xyz, axis);
+        let projectedAxis: vec3f = axis * fProjectedLength;
+        let projectedNormal: vec3f = viewSpaceNormal.xyz - projectedAxis;
+        let fProjectedNormalLength: f32 = length(projectedNormal);
+        //if(fProjectedNormalLength == 0.0f)
+        //{
+        //    continue;
+        //}
+    
+        // angle between view vector and projected normal vector
+        let fCosineProjectedNormal: f32 = clamp(dot(projectedNormal, viewDirection) / (fProjectedNormalLength + 0.0001f), 0.0f, 1.0f);
+        let sliceTangent: vec3f = cross(viewDirection, axis);
+        let fViewToProjectedNormalAngle: f32 = sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
+
+        // sections on the slice
+        var iAOBitMask: u32 = 0u;
+        var fSampleDirection: f32 = 1.0f;
+        var iOccludedBits: u32 = 0u;
+        for(var iDirection: u32 = 0u; iDirection < 2u; iDirection++)
+        {
+            fSampleDirection = 1.0f;
+            if(iDirection > 0)
+            {
+                fSampleDirection = -1.0f;
+            }
+            for(var iSection: u32 = 0u; iSection < kiNumSections; iSection++)
+            {
+                // sample view clip space position and normal
+                let sampleUV: vec2f = in.uv.xy + omega * uvStep * fSampleDirection * f32(iSection);
+
+                var sampleWorldPosition: vec4f = textureSample(
+                    worldPositionTexture,
+                    textureSampler,
+                    sampleUV
+                );
+                let sampleViewPosition: vec3f = sampleWorldPosition.xyz - cameraPosition;
+
+                // sample view position - current view position
+                let deltaViewSpacePosition: vec3f = sampleViewPosition.xyz - viewPosition.xyz;
+                let fDeltaViewSpaceLength: f32 = dot(deltaViewSpacePosition, deltaViewSpacePosition);
+                //if(fDeltaViewSpaceLength <= 0.0f)
+                //{
+                //    continue;
+                //}
+
+                // front and back horizon angle
+                let backDeltaViewPosition: vec3f = deltaViewSpacePosition - viewDirection * kfThickness;
+                var fHorizonAngleFront: f32 = dot(deltaViewSpacePosition / (fDeltaViewSpaceLength + 0.0001f), viewDirection);
+                var fHorizonAngleBack: f32 = dot(normalize(backDeltaViewPosition), viewDirection);
+
+                fHorizonAngleFront = acos(fHorizonAngleFront);
+                fHorizonAngleBack = acos(fHorizonAngleBack);
+
+                // convert to percentage relative projected normal angle as the middle angle
+                let fMinAngle: f32 = fViewToProjectedNormalAngle - PI * 0.5f;
+                let fMaxAngle: f32 = fViewToProjectedNormalAngle + PI * 0.5f;
+                let fPct0: f32 = clamp((fHorizonAngleFront - fMinAngle) / PI, 0.0f, 1.0f);
+                let fPct1: f32 = clamp((fHorizonAngleBack - fMinAngle) / PI, 0.0f, 1.0f);
+                var horizonAngle: vec2f = vec2f(fPct1, fPct0);
+                if(fSampleDirection < 0.0f)
+                {
+                    horizonAngle = vec2f(fPct0, fPct1);
+                }
+                
+                // set the section bit for this sample
+                let iStartHorizon: u32 = u32(horizonAngle.x * f32(kiNumSections));
+                let fHorizonAngle: f32 = ceil((horizonAngle.x - horizonAngle.y) * f32(kiNumSections));
+                var iAngleHorizon: u32 = 0u;
+                if(fHorizonAngle > 0.0f) 
+                {
+                    iAngleHorizon = 1u;
+                }
+                if(iAngleHorizon > 0u)
+                {
+                    iOccludedBits |= (1u << iStartHorizon);
+                }
+            
+            }   // for slice
+
+            let iNumBits: u32 = CountBits(iOccludedBits);
+            iCountedBits += iNumBits;
+
+        }   // for direction
+
+        iTotalBits += kiNumSections;
+
+    }   // for slice
+
+    var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
+    fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
+    out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
+
+    return out;
+}
