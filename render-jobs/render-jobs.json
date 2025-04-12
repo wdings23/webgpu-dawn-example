@@ -21,6 +21,12 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "PBR Graphics",
+            "Pipeline": "pbr-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "Ambient Occlusion Graphics",
             "Pipeline": "screen-space-visibility-bitmask-ambient-occlusion-graphics.json",
             "Type": "Graphics",

@@ -40,6 +40,9 @@ struct DefaultUniformData
 var ambientOcclusionTexture: texture_2d<f32>;
 
 @group(0) @binding(1)
+var pbrTexture: texture_2d<f32>;
+
+@group(0) @binding(2)
 var selectionTexture: texture_2d<f32>;
 
 @group(1) @binding(0)
@@ -70,6 +73,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         textureSampler,
         in.uv
     ) * 
+    textureSample(
+        pbrTexture,
+        textureSampler,
+        in.uv
+    ) *
     textureSample(
         selectionTexture,
         textureSampler,

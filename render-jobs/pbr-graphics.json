@@ -1,32 +1,33 @@
 {
     "Type": "Graphics",
     "PassType": "Full Triangle",
-    "Shader": "composite-graphics.shader",
+    "Shader": "pbr-graphics.shader",
     "Attachments": [
         {
-            "Name" : "Composite Output",
+            "Name" : "PBR Output",
             "Type": "TextureOutput",
             "Format": "rgba32float"
         },
         
         {
-            "Name" : "Ambient Occlusion Output",
+            "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Ambient Occlusion Graphics"
+            "ParentJob": "Deferred Indirect Graphics"
         },
         {
-            "Name" : "PBR Output",
+            "Name" : "Normal Output",
             "Type": "TextureInput",
-            "ParentJob": "PBR Graphics"
-        },
-        {
-            "Name" : "Selection Output",
-            "Type": "TextureInput",
-            "ParentJob": "Mesh Selection Graphics"
+            "ParentJob": "Deferred Indirect Graphics"
         }
     ],
     "ShaderResources": [
-        
+        {
+            "name" : "meshExtents",
+            "type": "buffer",
+            "shader_stage" : "vertex",
+            "usage": "read_only_storage",
+            "external": "true"
+        }
     ],
     "BlendStates": [
         {

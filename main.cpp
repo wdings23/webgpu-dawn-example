@@ -312,8 +312,8 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    desc.mMeshFilePath = "Vinci_SurfacePro11";
-    //desc.mMeshFilePath = "bistro-total";
+    //desc.mMeshFilePath = "Vinci_SurfacePro11";
+    desc.mMeshFilePath = "bistro-total";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
