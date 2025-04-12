@@ -285,6 +285,12 @@ namespace Render
             aFullScreenTriangles, 
             3 * sizeof(Vertex));
 
+        bufferDesc.size = 256 * sizeof(float2);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["blueNoiseBuffer"] = device.CreateBuffer(&bufferDesc);
+        maBuffers["blueNoiseBuffer"].SetLabel("Blue Noise Buffer");
+        maBufferSizes["blueNoiseBuffer"] = (uint32_t)bufferDesc.size;
+
         mpSampler = desc.mpSampler;
         
         createRenderJobs(desc);
@@ -329,6 +335,8 @@ namespace Render
         defaultUniformData.miScreenWidth = (int32_t)mCreateDesc.miScreenWidth;
         defaultUniformData.miScreenHeight = (int32_t)mCreateDesc.miScreenHeight;
         defaultUniformData.miFrame = miFrame;
+        defaultUniformData.mCameraPosition = float4(mCameraPosition, 1.0f);
+        defaultUniformData.mCameraLookDir = float4(mCameraLookAt, 1.0f);
 
         // update default uniform buffer
         mpDevice->GetQueue().WriteBuffer(
@@ -846,9 +854,9 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
-        //wgpu::Texture& swapChainTexture = maRenderJobs["Composite Graphics"]->mOutputImageAttachments["Composite Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs["Composite Graphics"]->mOutputImageAttachments["Composite Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
-        wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());

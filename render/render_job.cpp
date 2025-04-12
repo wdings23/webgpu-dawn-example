@@ -68,6 +68,10 @@ namespace Render
                 {
                     format = wgpu::TextureFormat::RG16Float;
                 }
+                else if(attachmentFormat == "r32float")
+                {
+                    format = wgpu::TextureFormat::R32Float;
+                }
                 aViewFormats.push_back(format);
 
                 // create texture

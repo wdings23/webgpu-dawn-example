@@ -34,6 +34,13 @@
             "size" : 2048,
             "shader_stage" : "all",
             "usage": "uniform"
+        },
+        { 
+            "name" : "blueNoiseBuffer",
+            "type" : "buffer",
+            "shader_stage" : "all",
+            "usage": "read_only_storage",
+            "external": "true"
         }    
     ],
     "BlendStates": [

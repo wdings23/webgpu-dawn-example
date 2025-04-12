@@ -12,8 +12,11 @@
 
 #include <utils/LogPrint.h>
 
-#define TINYEXR_IMPLEMENTATION
-#include <tinyexr/tinyexr.h>
+//#define TINYEXR_IMPLEMENTATION
+//#include <tinyexr/tinyexr.h>
+
+#include <utils/halton.h>
+#include <utils/blue_noise.h>
 
 #define PI 3.14159f
 
@@ -65,12 +68,13 @@ float           gfExplodeMultiplier = 0.0f;
 State           gState;
 
 float2 gCameraAngle(0.0f, 0.0f);
-float3 gInitialCameraPosition(0.0f, 6.0f, -3.0f);
-float3 gInitialCameraLookAt(0.0f, 6.0f, 0.0f);
+float3 gInitialCameraPosition(0.0f, 0.0f, -3.0f);
+float3 gInitialCameraLookAt(0.0f, 0.0f, 0.0f);
 
 std::vector<int32_t> aiHiddenMeshes;
 std::vector<uint32_t> aiVisibilityFlags;
 std::vector<float2> gaHaltonSequence;
+std::vector<float2> gaBlueNoise;
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -86,7 +90,6 @@ void handleCameraMousePan(
 
 void zoomToSelection();
 
-float2 get_jitter_offset(int frame_index, int width, int height);
 
 /*
 **
@@ -309,8 +312,8 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    //desc.mMeshFilePath = "Vinci_SurfacePro11";
-    desc.mMeshFilePath = "bistro-total";
+    desc.mMeshFilePath = "Vinci_SurfacePro11";
+    //desc.mMeshFilePath = "bistro-total";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -331,10 +334,28 @@ void start()
         return;
     }
 
+    // halton sequence for camera jitters
     gaHaltonSequence.resize(64);
     for(uint32_t i = 0; i < 64; i++)
     {
-        gaHaltonSequence[i] = get_jitter_offset(i, 512, 512);
+        gaHaltonSequence[i] = Utils::get_jitter_offset(i, 512, 512);
+    }
+
+    // blue noise 
+    uint32_t iBlueNoiseSize = 32;
+    std::vector<std::pair<float, float>> aBlueNoisePts = Utils::generatePoints(
+        2.0f,
+        iBlueNoiseSize,
+        iBlueNoiseSize
+    );
+    gaBlueNoise.resize(aBlueNoisePts.size());
+    for(uint32_t i = 0; i < (uint32_t)aBlueNoisePts.size(); i++)
+    {
+        aBlueNoisePts[i].first /= float(iBlueNoiseSize);
+        aBlueNoisePts[i].second /= float(iBlueNoiseSize);
+
+        gaBlueNoise[i].x = aBlueNoisePts[i].first - 0.5f;
+        gaBlueNoise[i].y = aBlueNoisePts[i].second - 0.5f;
     }
 
     gCameraLookAt = gInitialCameraLookAt;
@@ -585,6 +606,13 @@ void start()
         (uint32_t)(aiVisibilityFlags.size() * sizeof(uint32_t))
     );
 
+    gRenderer.setBufferData(
+        "blueNoiseBuffer",
+        gaBlueNoise.data(),
+        0,
+        (uint32_t)(sizeof(float2)* gaBlueNoise.size())
+    );
+
 #if defined(__EMSCRIPTEN__)
     emscripten_set_main_loop(render, 0, false);
 #else
@@ -655,6 +683,7 @@ float sign(float fVal)
 */
 void verifyTest()
 {
+#if 0
     std::vector<float4> worldPositionImage;
     std::vector<float4> normalImage;
     std::vector<float4> texAndClipSpaceImage;
@@ -748,7 +777,7 @@ void verifyTest()
     uint32_t const kiNumSections = 32;
     float const kfThickness = 0.001f;
 
-    float fSampleRadius = 2.0f;
+    float fSampleRadius = 4.0f;
 
     uint2 textureSize = uint2(iImageWidth, iImageHeight);
     float2 uvStep = float2(
@@ -782,10 +811,10 @@ void verifyTest()
 
     std::vector<float4> paOutputImage(iImageWidth * iImageHeight);
     for(int32_t iY = 0; iY < iImageWidth; iY++)
-    //for(int32_t iY = 661; iY <= 661; iY++)
+    //for(int32_t iY = 660; iY <= 660; iY++)
     {
         for(int32_t iX = 0; iX < iImageWidth; iX++)
-        //for(int32_t iX = 844; iX <= 844; iX++)
+        //for(int32_t iX = 843; iX <= 843; iX++)
         {
             float2 uv = float2((float)iX / (float)iImageWidth, (float)iY / (float)iImageHeight);
 
@@ -809,10 +838,10 @@ void verifyTest()
             for(uint32_t iSlice = 0; iSlice < kiNumSlices; iSlice++)
             {
                 float fPhi = float(iSlice) * ((2.0f * PI) / float(kiNumSlices));
-                float2 omega = float2(cos(fPhi), sin(fPhi));
+                float2 omega = float2(cos(fPhi), -sin(fPhi));
                 float3 screenSpaceDirection = float3(omega.x, omega.y, 0.0f);
                 float3 orthoDirection = screenSpaceDirection - (viewDirection * dot(screenSpaceDirection, viewDirection));
-                float3 axis = cross(viewDirection, normalize(orthoDirection));
+                float3 axis = cross(viewDirection, orthoDirection);
                 float fProjectedLength = dot(viewSpaceNormal, axis);
                 float3 projectedAxis = axis * fProjectedLength;
                 float3 projectedNormal = viewSpaceNormal - projectedAxis;
@@ -826,9 +855,9 @@ void verifyTest()
                 
                 // angle between view vector and projected normal vector
                 float3 sliceTangent = cross(viewDirection, axis);
-                float fViewToProjectedNormalAngle = sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
+                //float fViewToProjectedNormalAngle = sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
 
-                //float fViewToProjectedNormalAngle = acos(fCosineProjectedNormal);
+                float fViewToProjectedNormalAngle = acos(fCosineProjectedNormal);
 
                 // sections on the slice
                 uint32_t iAOBitMask = 0u;
@@ -868,7 +897,7 @@ void verifyTest()
                         
                         // sample view position - current view position
                         float3 deltaViewSpacePosition = float3(sampleViewPosition) - viewPosition;
-                        float fDeltaViewSpaceLength = length(deltaViewSpacePosition);
+                        float fDeltaViewSpaceLength = dot(deltaViewSpacePosition, deltaViewSpacePosition);
                         if(fDeltaViewSpaceLength <= 0.0f)
                         {
                             continue;
@@ -878,7 +907,7 @@ void verifyTest()
                         float3 backDeltaViewPosition = deltaViewSpacePosition - viewDirection * kfThickness;
                         float fHorizonAngleFront = dot(normalize(deltaViewSpacePosition), viewDirection);
                         float fHorizonAngleBack = dot(normalize(backDeltaViewPosition), viewDirection);
-
+                        
                         fHorizonAngleFront = acos(fHorizonAngleFront);
                         fHorizonAngleBack = acos(fHorizonAngleBack);
 
@@ -888,10 +917,10 @@ void verifyTest()
                         float fPct0 = clamp((fHorizonAngleFront - fMinAngle) / PI, 0.0f, 1.0f);
                         float fPct1 = clamp((fHorizonAngleBack - fMinAngle) / PI, 0.0f, 1.0f);
                         float2 horizonAngle = float2(fPct1, fPct0);
-                        //if(fSampleDirection < 0.0f)
-                        //{
-                        //    horizonAngle = float2(fPct0, fPct1);
-                        //}
+                        if(fSampleDirection < 0.0f)
+                        {
+                            horizonAngle = float2(fPct0, fPct1);
+                        }
 
                         // set the section bit for this sample
                         uint32_t iStartHorizon = uint32_t(horizonAngle.x * (float)kiNumSections);
@@ -940,6 +969,7 @@ void verifyTest()
 
     SaveEXR((float const*)paOutputImage.data(), iImageWidth, iImageHeight, 4, 0, "D:\\Downloads\\render-doc-image-outputs\\output-ao.exr", &error);
     int iDebug = 1;
+#endif // #if 0
 }
 
 /*
@@ -947,7 +977,9 @@ void verifyTest()
 */
 int main() 
 {
-    verifyTest();
+    //verifyTest();
+
+    
 
 #if defined(__EMSCRIPTEN__)
     instance = wgpu::CreateInstance();
@@ -1309,29 +1341,4 @@ void zoomToSelection()
             gRenderer.setExplosionMultiplier(0.0f);
         }
     }
-}
-
-float halton(int index, int base) 
-{
-    float f = 1.0f;
-    float r = 0.0f;
-    while(index > 0) {
-        f = f / base;
-        r = r + f * (index % base);
-        index = index / base;
-    }
-    return r;
-}
-float2 halton_2d(int index) 
-{
-    return float2(halton(index, 2), halton(index, 3));
-}
-
-float2 get_jitter_offset(int frame_index, int width, int height) 
-{
-    float2 halton_sample = halton_2d(frame_index);
-    // Scale and translate to center around pixel center and limit to pixel range
-    float x = ((halton_sample.x - 0.5f) / width) * 2.0f;
-    float y = ((halton_sample.y - 0.5f) / height) * 2.0f;
-    return float2(x, y);
 }

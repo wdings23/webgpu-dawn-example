@@ -80,16 +80,16 @@ var normalTexture: texture_2d<f32>;
 @group(0) @binding(2)
 var textureCoordAndClipSpaceTexture: texture_2d<f32>;
 
-@group(0) @binding(3)
-var viewPositionTexture: texture_2d<f32>;
-
 @group(1) @binding(0)
 var<uniform> uniformData: UniformData;
 
 @group(1) @binding(1)
-var<uniform> defaultUniformBuffer: DefaultUniformData;
+var<storage, read> blueNoiseBuffer: array<vec2f>;
 
 @group(1) @binding(2)
+var<uniform> defaultUniformBuffer: DefaultUniformData;
+
+@group(1) @binding(3)
 var textureSampler: sampler;
 
 @vertex
@@ -155,24 +155,39 @@ fn ao(in: VertexOutput) -> FragmentOutput
 {
     var out: FragmentOutput;
 
-    let kiNumSections: u32 = 32u;
-    let kiNumSlices: u32 = 32u;
+    let kiNumSections: u32 = 16u;
+    let kiNumSlices: u32 = 16u;
     let kfThickness: f32 = 0.0001f;
 
-    var worldPosition: vec4f = textureSample(
+    let screenCoord: vec2i = vec2i(
+        i32(in.uv.x * f32(defaultUniformBuffer.miScreenWidth)),
+        i32(in.uv.y * f32(defaultUniformBuffer.miScreenHeight))
+    );
+
+    //var worldPosition: vec4f = textureSample(
+    //    worldPositionTexture, 
+    //    textureSampler, 
+    //    in.uv);
+
+    var worldPosition: vec4f = textureLoad(
         worldPositionTexture, 
-        textureSampler, 
-        in.uv);
+        screenCoord,
+        0);
 
     if(worldPosition.w <= 0.0f)
     {
-        out.mAmbientOcclusion = vec4f(0.0f, 0.0f, 0.0f, 0.0f);
+        out.mAmbientOcclusion = vec4f(1.0f, 1.0f, 1.0f, 0.0f);
+        return out;
     }
 
-    let normal: vec4f = textureSample(
+    //let normal: vec4f = textureSample(
+    //    normalTexture, 
+    //    textureSampler, 
+    //    in.uv);
+    let normal: vec4f = textureLoad(
         normalTexture, 
-        textureSampler, 
-        in.uv);
+        screenCoord, 
+        0);
 
     var viewMatrix: mat4x4<f32> = defaultUniformBuffer.mViewMatrix;
     viewMatrix[0] = vec4f(viewMatrix[0].xyz, 0.0f);
@@ -181,7 +196,10 @@ fn ao(in: VertexOutput) -> FragmentOutput
     
     let cameraPosition: vec3f = defaultUniformBuffer.mCameraPosition.xyz;
     let viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
-    let fSampleRadius: f32 = 2.0f;
+    let fSampleRadius: f32 = 4.0f;
+
+    let iBlueNoiseIndex: i32 = (screenCoord.y * defaultUniformBuffer.miScreenWidth + screenCoord.x + defaultUniformBuffer.miFrame) % 128;
+    let fRadius: f32 = blueNoiseBuffer[iBlueNoiseIndex].x * fSampleRadius;
 
     var textureSize: vec2u = textureDimensions(worldPositionTexture);
     let uvStep: vec2f = vec2<f32>(
@@ -238,11 +256,25 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 // sample view clip space position and normal
                 let sampleUV: vec2f = in.uv.xy + omega * uvStep * fSampleDirection * f32(iSection);
 
-                var sampleWorldPosition: vec4f = textureSample(
-                    worldPositionTexture,
-                    textureSampler,
-                    sampleUV
+                //var sampleWorldPosition: vec4f = textureSample(
+                //    worldPositionTexture,
+                //    textureSampler,
+                //    sampleUV
+                //);
+                let sampleScreenCoord: vec2i = vec2i(
+                    i32(sampleUV.x * f32(defaultUniformBuffer.miScreenWidth)),
+                    i32(sampleUV.y * f32(defaultUniformBuffer.miScreenHeight))
                 );
+                var sampleWorldPosition: vec4f = textureLoad(
+                    worldPositionTexture,
+                    sampleScreenCoord,
+                    0
+                );
+                if(sampleWorldPosition.w <= 0.0f)
+                {
+                    continue;
+                }
+
                 let sampleViewPosition: vec3f = sampleWorldPosition.xyz - cameraPosition;
 
                 // sample view position - current view position
@@ -297,7 +329,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     }   // for slice
 
     var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
-    fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
+    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
 
     return out;
