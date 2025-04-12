@@ -157,7 +157,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
 
     let kiNumSections: u32 = 16u;
     let kiNumSlices: u32 = 16u;
-    let kfThickness: f32 = 0.0001f;
+    let kfThickness: f32 = 0.0005f;
 
     let screenCoord: vec2i = vec2i(
         i32(in.uv.x * f32(defaultUniformBuffer.miScreenWidth)),
@@ -196,7 +196,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     
     let cameraPosition: vec3f = defaultUniformBuffer.mCameraPosition.xyz;
     let viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
-    let fSampleRadius: f32 = 4.0f;
+    let fSampleRadius: f32 = 2.0f;
 
     let iBlueNoiseIndex: i32 = (screenCoord.y * defaultUniformBuffer.miScreenWidth + screenCoord.x + defaultUniformBuffer.miFrame) % 128;
     let fRadius: f32 = blueNoiseBuffer[iBlueNoiseIndex].x * fSampleRadius;
@@ -207,7 +207,8 @@ fn ao(in: VertexOutput) -> FragmentOutput
         1.0f / f32(textureSize.y)) * fSampleRadius;
 
     let viewPosition: vec3f = worldPosition.xyz - cameraPosition;
-    let viewDirection: vec3f = normalize(viewPosition);
+    var viewDirection: vec3f = normalize(viewPosition * -1.0f);
+    viewDirection.z = -viewDirection.z;
 
     // sample multiple slices around the view direction
     var iTotalBits: u32 = 0u;
