@@ -697,6 +697,7 @@ void verifyTest()
     free(pafViewImageData);
 
     uint32_t textureSampler = 1;
+    float4 const* worldPositionTexture = worldPositionImage.data();
     float4 const* normalTexture = normalImage.data();
     float4 const* textureCoordAndClipSpaceTexture = texAndClipSpaceImage.data();
     float4 const* depthTexture = depthImage.data();
@@ -711,8 +712,8 @@ void verifyTest()
 
     auto textureSample = [iImageWidth, iImageHeight](float4 const* texture, uint32_t iTextureSampler, float2 uv)
         {
-            uint32_t iX = uint32_t(uv.x * float(iImageWidth));
-            uint32_t iY = uint32_t(uv.y * float(iImageHeight));
+            uint32_t iX = clamp(uint32_t(uv.x * float(iImageWidth)), 0, iImageWidth - 1);
+            uint32_t iY = clamp(uint32_t(uv.y * float(iImageHeight)), 0, iImageWidth - 1);
 
             uint32_t iIndex = iY * iImageWidth + iX;
             return texture[iIndex];
@@ -745,9 +746,9 @@ void verifyTest()
 
     uint32_t const kiNumSlices = 16;
     uint32_t const kiNumSections = 32;
-    float const kfThickness = 0.0001f;
+    float const kfThickness = 0.001f;
 
-    float fSampleRadius = 1.0f;
+    float fSampleRadius = 2.0f;
 
     uint2 textureSize = uint2(iImageWidth, iImageHeight);
     float2 uvStep = float2(
@@ -760,19 +761,48 @@ void verifyTest()
     //viewDirection = vec3(0.0f, 0.0f, -1.0f);
     //viewSpaceNormal = vec3(0.0f, 1.0f, 0.0f);
 
+    
+    CameraUpdateInfo cameraInfo = {};
+    cameraInfo.mfFar = 100.0f;
+    cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
+    cameraInfo.mfNear = 0.01f;
+    cameraInfo.mfViewWidth = (float)kWidth;
+    cameraInfo.mfViewHeight = (float)kHeight;
+    cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
+    cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
+    cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
+    CCamera camera;
+    camera.setLookAt(cameraLookAt);
+    camera.setPosition(cameraPosition);
+    camera.update(cameraInfo);
+    float4x4 viewMatrix = camera.getViewMatrix();
+    viewMatrix.mafEntries[3] = 0.0f;
+    viewMatrix.mafEntries[7] = 0.0f;
+    viewMatrix.mafEntries[11] = 0.0f;
+
     std::vector<float4> paOutputImage(iImageWidth * iImageHeight);
     for(int32_t iY = 0; iY < iImageWidth; iY++)
+    //for(int32_t iY = 661; iY <= 661; iY++)
     {
         for(int32_t iX = 0; iX < iImageWidth; iX++)
+        //for(int32_t iX = 844; iX <= 844; iX++)
         {
             float2 uv = float2((float)iX / (float)iImageWidth, (float)iY / (float)iImageHeight);
 
-            float4 viewPosition = textureSample(
-                viewTexture,
+            float4 worldPosition = textureSample(
+                worldPositionTexture,
                 textureSampler,
                 uv
             );
+            float3 viewPosition = float3(worldPosition.x, worldPosition.y, worldPosition.z) - cameraPosition;
             float3 viewDirection = normalize(viewPosition * -1.0f);
+            
+            float4 normal = textureSample(
+                normalTexture,
+                textureSampler,
+                uv
+            );
+            viewSpaceNormal = viewMatrix * normal;
 
             uint32_t iTotalBits = 0;
             uint32_t iCountedBits = 0;
@@ -780,21 +810,25 @@ void verifyTest()
             {
                 float fPhi = float(iSlice) * ((2.0f * PI) / float(kiNumSlices));
                 float2 omega = float2(cos(fPhi), sin(fPhi));
-                float2 screenSpaceDirection = omega;
-                float3 slicePlaneNormal = cross(viewDirection, normalize(float3(screenSpaceDirection.x, screenSpaceDirection.y, 0.0f)));
-                float fProjectedLength = dot(viewSpaceNormal, slicePlaneNormal);
-                float3 projectedPlaneNormal = slicePlaneNormal * fProjectedLength;
-                float3 projectedNormal = viewSpaceNormal - projectedPlaneNormal;
+                float3 screenSpaceDirection = float3(omega.x, omega.y, 0.0f);
+                float3 orthoDirection = screenSpaceDirection - (viewDirection * dot(screenSpaceDirection, viewDirection));
+                float3 axis = cross(viewDirection, normalize(orthoDirection));
+                float fProjectedLength = dot(viewSpaceNormal, axis);
+                float3 projectedAxis = axis * fProjectedLength;
+                float3 projectedNormal = viewSpaceNormal - projectedAxis;
                 float fProjectedNormalLength = length(projectedNormal);
                 if(fProjectedNormalLength == 0.0f)
                 {
                     continue;
                 }
-                float fCosineNormal = clamp(dot(projectedNormal, viewDirection) / fProjectedLength, 0.0f, 1.0f);
-
+                
+                float fCosineProjectedNormal = clamp(dot(projectedNormal, viewDirection) / fProjectedNormalLength, 0.0f, 1.0f);
+                
                 // angle between view vector and projected normal vector
-                float3 sliceTangent = cross(viewDirection, slicePlaneNormal);
-                float fViewToProjectedNormalAngle = sign(dot(projectedNormal, sliceTangent)) * acos(fCosineNormal);
+                float3 sliceTangent = cross(viewDirection, axis);
+                float fViewToProjectedNormalAngle = sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
+
+                //float fViewToProjectedNormalAngle = acos(fCosineProjectedNormal);
 
                 // sections on the slice
                 uint32_t iAOBitMask = 0u;
@@ -806,7 +840,9 @@ void verifyTest()
                     for(int32_t iSection = 0; iSection < kiNumSections / 2; iSection++)
                     {
                         // sample view clip space position and normal
-                        float2 sampleUV = inputUV + omega * uvStep * fSampleDirection * float(iSection);
+                        float2 sampleUV = uv + omega * uvStep * fSampleDirection * float(iSection);
+                        sampleUV.x = clamp(sampleUV.x, 0.0f, 1.0f);
+                        sampleUV.y = clamp(sampleUV.y, 0.0f, 1.0f);
 
                         uint32_t iSampleX = uint32_t(float(sampleUV.x) * float(iImageWidth));
                         uint32_t iSampleY = uint32_t(float(sampleUV.y) * float(iImageHeight));
@@ -817,13 +853,8 @@ void verifyTest()
                         }
 
                         // sample depth and clip space
-                        float4 sampleViewPosition = textureSample(
-                            viewTexture,
-                            textureSampler,
-                            sampleUV
-                        );
-                        float4 sampleTextureCoordAndClipSpace = textureSample(
-                            textureCoordAndClipSpaceTexture,
+                        float4 sampleWorldPosition = textureSample(
+                            worldPositionTexture,
                             textureSampler,
                             sampleUV
                         );
@@ -833,37 +864,59 @@ void verifyTest()
                             sampleUV
                         );
 
+                        float3 sampleViewPosition = float3(sampleWorldPosition.x, sampleWorldPosition.y, sampleWorldPosition.z) - cameraPosition;
+                        
                         // sample view position - current view position
                         float3 deltaViewSpacePosition = float3(sampleViewPosition) - viewPosition;
                         float fDeltaViewSpaceLength = length(deltaViewSpacePosition);
+                        if(fDeltaViewSpaceLength <= 0.0f)
+                        {
+                            continue;
+                        }
 
+                        // front and back horizon angle
                         float3 backDeltaViewPosition = deltaViewSpacePosition - viewDirection * kfThickness;
                         float fHorizonAngleFront = dot(normalize(deltaViewSpacePosition), viewDirection);
                         float fHorizonAngleBack = dot(normalize(backDeltaViewPosition), viewDirection);
 
-                        // front and back horizon angle
                         fHorizonAngleFront = acos(fHorizonAngleFront);
                         fHorizonAngleBack = acos(fHorizonAngleBack);
 
-                        //float2 horizonAngle = float2(fHorizonAngleFront, fHorizonAngleBack);
+                        // convert to percentage relative projected normal angle as the middle angle
+                        float fMinAngle = fViewToProjectedNormalAngle - PI * 0.5f;
+                        float fMaxAngle = fViewToProjectedNormalAngle + PI * 0.5f;
+                        float fPct0 = clamp((fHorizonAngleFront - fMinAngle) / PI, 0.0f, 1.0f);
+                        float fPct1 = clamp((fHorizonAngleBack - fMinAngle) / PI, 0.0f, 1.0f);
+                        float2 horizonAngle = float2(fPct1, fPct0);
                         //if(fSampleDirection < 0.0f)
                         //{
-                        //    horizonAngle = float2(fHorizonAngleBack, fHorizonAngleFront);
+                        //    horizonAngle = float2(fPct0, fPct1);
                         //}
 
-                        // percentage in the half circle slice
-                        float fV0 = (fHorizonAngleFront + fViewToProjectedNormalAngle + PI * 0.5f) / PI;
-                        float fV1 = (fHorizonAngleBack + fViewToProjectedNormalAngle + PI * 0.5f) / PI;
-                        float2 horizonAngle = float2(fV0, fV1);
-                        if(fSampleDirection < 0.0f)
-                        {
-                            horizonAngle = float2(fV1, fV0);
-                        }
-
+                        // set the section bit for this sample
                         uint32_t iStartHorizon = uint32_t(horizonAngle.x * (float)kiNumSections);
                         float fHorizonAngle = ceil((horizonAngle.x - horizonAngle.y) * float(kiNumSections));
                         uint32_t iAngleHorizon = (fHorizonAngle > 0.0f) ? 1 : 0;
-                        iOccludedBits |= (1 << iStartHorizon);
+                        if(iAngleHorizon > 0)
+                        {
+                            iOccludedBits |= (1 << iStartHorizon);
+                        }
+
+#if 0
+                        DEBUG_PRINTF("%d view delta (%.4f, %.4f, %.4f) angle %.4f mid angle %.4f pct %.4f angle bit %d\n\trange(%.4f, %4f)\n\n",
+                            iSection,
+                            deltaViewSpacePosition.x,
+                            deltaViewSpacePosition.y,
+                            deltaViewSpacePosition.z,
+                            fHorizonAngleFront,
+                            fViewToProjectedNormalAngle,
+                            fPct0,
+                            iAngleHorizon,
+                            fMinAngle,
+                            fMaxAngle);
+                        
+                        int iDebug = 1;
+#endif // #if 0
 
                     }   // for sections
 
