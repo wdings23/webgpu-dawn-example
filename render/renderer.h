@@ -91,6 +91,15 @@ namespace Render
             return miFrame;
         }
 
+        inline void setCameraPositionAndLookAt(
+            float3 const& cameraPosition,
+            float3 const& cameraLookAt
+        )
+        {
+            mCameraPosition = cameraPosition;
+            mCameraLookAt = cameraLookAt;
+        }
+
     public:
         struct MeshExtent
         {
@@ -151,6 +160,9 @@ namespace Render
 
 
         uint32_t*                               maiVisibilityFlags = nullptr;
+
+        float3                                  mCameraPosition;
+        float3                                  mCameraLookAt;
     };
 
 }   // Render
