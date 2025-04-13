@@ -157,7 +157,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
 
     let kiNumSections: u32 = 16u;
     let kiNumSlices: u32 = 16u;
-    let kfThickness: f32 = 0.0005f;
+    let kfThickness: f32 = 0.01f;
 
     let screenCoord: vec2i = vec2i(
         i32(in.uv.x * f32(defaultUniformBuffer.miScreenWidth)),
@@ -195,10 +195,11 @@ fn ao(in: VertexOutput) -> FragmentOutput
     viewMatrix[2] = vec4f(viewMatrix[2].xyz, 0.0f);
     
     let cameraPosition: vec3f = defaultUniformBuffer.mCameraPosition.xyz;
-    let viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
-    let fSampleRadius: f32 = 2.0f;
+    var viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
+    viewSpaceNormal.z = -viewSpaceNormal.z;
+    let fSampleRadius: f32 = 1.0f;
 
-    let iBlueNoiseIndex: i32 = (screenCoord.y * defaultUniformBuffer.miScreenWidth + screenCoord.x + defaultUniformBuffer.miFrame) % 128;
+    var iBlueNoiseIndex: i32 = (screenCoord.y * defaultUniformBuffer.miScreenWidth + screenCoord.x/* + defaultUniformBuffer.miFrame*/) % 128;
     let fRadius: f32 = blueNoiseBuffer[iBlueNoiseIndex].x * fSampleRadius;
 
     var textureSize: vec2u = textureDimensions(worldPositionTexture);
@@ -208,7 +209,6 @@ fn ao(in: VertexOutput) -> FragmentOutput
 
     let viewPosition: vec3f = worldPosition.xyz - cameraPosition;
     var viewDirection: vec3f = normalize(viewPosition * -1.0f);
-    viewDirection.z = -viewDirection.z;
 
     // sample multiple slices around the view direction
     var iTotalBits: u32 = 0u;
@@ -222,7 +222,14 @@ fn ao(in: VertexOutput) -> FragmentOutput
         // 3) get the projected length of the view space normal to the slice plane normal to apply to the plane normal 
         // 4) subtract the view space normal with projected plane normal to get the projected view space to slice normal
         // 5) cosine of the view direction on the slice plane is the dot product of projected normal and view direction
+        iBlueNoiseIndex = (iBlueNoiseIndex + i32(iSlice)) % 128;
         let fPhi: f32 = f32(iSlice) * ((2.0f * PI) / f32(kiNumSlices));
+        //let fSampleLength: f32 = sqrt(blueNoiseBuffer[iBlueNoiseIndex].x * blueNoiseBuffer[iBlueNoiseIndex].x + blueNoiseBuffer[iBlueNoiseIndex].y + blueNoiseBuffer[iBlueNoiseIndex].y);
+        //var fPhi: f32 = atan2(blueNoiseBuffer[iBlueNoiseIndex].y, blueNoiseBuffer[iBlueNoiseIndex].x);
+        //if(fPhi < 0.0f)
+        //{
+        //    fPhi = 2.0f * PI - fPhi;
+        //}
         let omega: vec2f = vec2f(cos(fPhi), sin(fPhi));
         let screenSpaceDirection: vec3f =  vec3f(omega.x, omega.y, 0.0f);
         let orthoDirection: vec3f = screenSpaceDirection - (viewDirection * dot(screenSpaceDirection, viewDirection));
@@ -231,15 +238,11 @@ fn ao(in: VertexOutput) -> FragmentOutput
         let projectedAxis: vec3f = axis * fProjectedLength;
         let projectedNormal: vec3f = viewSpaceNormal.xyz - projectedAxis;
         let fProjectedNormalLength: f32 = length(projectedNormal);
-        //if(fProjectedNormalLength == 0.0f)
-        //{
-        //    continue;
-        //}
-    
+        
         // angle between view vector and projected normal vector
         let fCosineProjectedNormal: f32 = clamp(dot(projectedNormal, viewDirection) / (fProjectedNormalLength + 0.0001f), 0.0f, 1.0f);
         let sliceTangent: vec3f = cross(viewDirection, axis);
-        let fViewToProjectedNormalAngle: f32 = sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
+        let fViewToProjectedNormalAngle: f32 = -sign(dot(projectedNormal, orthoDirection)) * acos(fCosineProjectedNormal);
 
         // sections on the slice
         var iAOBitMask: u32 = 0u;
@@ -256,12 +259,6 @@ fn ao(in: VertexOutput) -> FragmentOutput
             {
                 // sample view clip space position and normal
                 let sampleUV: vec2f = in.uv.xy + omega * uvStep * fSampleDirection * f32(iSection);
-
-                //var sampleWorldPosition: vec4f = textureSample(
-                //    worldPositionTexture,
-                //    textureSampler,
-                //    sampleUV
-                //);
                 let sampleScreenCoord: vec2i = vec2i(
                     i32(sampleUV.x * f32(defaultUniformBuffer.miScreenWidth)),
                     i32(sampleUV.y * f32(defaultUniformBuffer.miScreenHeight))
@@ -281,11 +278,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 // sample view position - current view position
                 let deltaViewSpacePosition: vec3f = sampleViewPosition.xyz - viewPosition.xyz;
                 let fDeltaViewSpaceLength: f32 = dot(deltaViewSpacePosition, deltaViewSpacePosition);
-                //if(fDeltaViewSpaceLength <= 0.0f)
-                //{
-                //    continue;
-                //}
-
+                
                 // front and back horizon angle
                 let backDeltaViewPosition: vec3f = deltaViewSpacePosition - viewDirection * kfThickness;
                 var fHorizonAngleFront: f32 = dot(deltaViewSpacePosition / (fDeltaViewSpaceLength + 0.0001f), viewDirection);
@@ -300,10 +293,10 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 let fPct0: f32 = clamp((fHorizonAngleFront - fMinAngle) / PI, 0.0f, 1.0f);
                 let fPct1: f32 = clamp((fHorizonAngleBack - fMinAngle) / PI, 0.0f, 1.0f);
                 var horizonAngle: vec2f = vec2f(fPct1, fPct0);
-                if(fSampleDirection < 0.0f)
-                {
-                    horizonAngle = vec2f(fPct0, fPct1);
-                }
+                //if(fSampleDirection < 0.0f)
+                //{
+                //    horizonAngle = vec2f(fPct0, fPct1);
+                //}
                 
                 // set the section bit for this sample
                 let iStartHorizon: u32 = u32(horizonAngle.x * f32(kiNumSections));
@@ -330,7 +323,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     }   // for slice
 
     var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
-    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
+    fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
 
     return out;
