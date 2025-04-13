@@ -8,6 +8,9 @@ target_include_directories(obj_2_binary PRIVATE ${CMAKE_SOURCE_DIR})
 target_include_directories(obj_2_binary PRIVATE ${CMAKE_SOURCE_DIR}/../../external)
 target_include_directories(obj_2_binary PRIVATE ${CMAKE_SOURCE_DIR}/../..)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+    -g -O0"
+  )
 
 target_sources(obj_2_binary PRIVATE 
   ${CMAKE_SOURCE_DIR}/../../math/vec.cpp

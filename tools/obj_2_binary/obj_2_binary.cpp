@@ -24,6 +24,10 @@
 
 #define POSITION_MULT 10.0
 
+#if defined(__APPLE__)
+#define FLT_MAX __FLT_MAX__
+#endif // __APPLE__ 
+
 std::mutex gMutex;
 
 struct Face
@@ -130,6 +134,10 @@ int main(int argc, char* argv[])
 {
     std::string fullPath = argv[1];
     auto iter = fullPath.rfind("\\");
+    if(iter == std::string::npos)
+    {
+        iter = fullPath.rfind("/");
+    }
     std::string directory = fullPath.substr(0, iter);
     std::string fileName = fullPath.substr(iter + 1);
     auto extensionIter = fileName.rfind(".obj");
@@ -421,7 +429,7 @@ int main(int argc, char* argv[])
             aOutputMaterialInfos[i].miSpecularTextureID = 0;
         }
 
-        std::string outputMaterialFilePath = directory + "\\" + baseName + ".mat";
+        std::string outputMaterialFilePath = directory + "/" + baseName + ".mat";
         FILE* fp = fopen(outputMaterialFilePath.c_str(), "wb");
         uint32_t iNumMaterials = (uint32_t)aOutputMaterialInfos.size();
         //fwrite(&iNumMaterials, sizeof(uint32_t), 1, fp);
@@ -429,7 +437,7 @@ int main(int argc, char* argv[])
         fclose(fp);
     }
 
-    std::string outputPath = directory + "\\" + baseName + "-mesh-instance-ids.bin";
+    std::string outputPath = directory + "/" + baseName + "-mesh-instance-ids.bin";
     FILE* fp = fopen(outputPath.c_str(), "wb");
     uint32_t iNumValidMeshes = (uint32_t)aMeshInstances.size();
     fwrite(&iNumValidMeshes, sizeof(uint32_t), 1, fp);
@@ -443,13 +451,13 @@ int main(int argc, char* argv[])
     fclose(fp);
 
     uint32_t iNumMeshes = (uint32_t)aMeshExtents.size();
-    outputPath = directory + "\\" + baseName + "-mesh-instance-positions.bin";
+    outputPath = directory + "/" + baseName + "-mesh-instance-positions.bin";
     fp = fopen(outputPath.c_str(), "wb");
     fwrite(&iNumMeshes, sizeof(uint32_t), 1, fp);
     fwrite(aMeshCenters.data(), sizeof(float3), aMeshCenters.size(), fp);
     fclose(fp);
 
-    outputPath = directory + "\\" + baseName + "-mesh-instance-bboxes.bin";
+    outputPath = directory + "/" + baseName + "-mesh-instance-bboxes.bin";
     fp = fopen(outputPath.c_str(), "wb");
     fwrite(&iNumMeshes, sizeof(uint32_t), 1, fp);
     fwrite(aMeshBBoxes.data(), sizeof(float3), aMeshBBoxes.size(), fp);
@@ -480,7 +488,7 @@ int main(int argc, char* argv[])
         directory,
         baseName);
 
-    std::string loadFullPath = directory + "\\" + baseName + "-triangles.bin";
+    std::string loadFullPath = directory + "/" + baseName + "-triangles.bin";
     std::vector<Vertex> aTestTotalVertices;
     std::vector<std::vector<uint32_t>> aaiTriangleIndices;
     std::vector<MeshRange> aMeshRanges;
@@ -501,7 +509,7 @@ void outputMeshMaterialIDs(
     std::string const& directory,
     std::string const& baseName)
 {
-    std::string fullPath = directory + "\\" + baseName + ".mid";
+    std::string fullPath = directory + "/" + baseName + ".mid";
     FILE* fp = fopen(fullPath.c_str(), "wb");
     fwrite(aiMeshMaterialIDs.data(), sizeof(uint32_t), aiMeshMaterialIDs.size(), fp);
     fclose(fp);
@@ -560,7 +568,7 @@ void outputVerticesAndTriangles(
     std::string const& directory,
     std::string const& baseName)
 {
-    std::string fullPath = directory + "\\" + baseName + "-triangles.bin";
+    std::string fullPath = directory + "/" + baseName + "-triangles.bin";
 
     uint32_t iNumMeshes = (uint32_t)aaiTriangleVertexIndices.size();
     std::vector<MeshRange> aMeshTriangleRanges(iNumMeshes);
@@ -624,7 +632,7 @@ void outputTrianglePositionsAndTriangles(
     std::string const& directory,
     std::string const& baseName)
 {
-    std::string fullPath = directory + "\\" + baseName + "-triangle-positions.bin";
+    std::string fullPath = directory + "/" + baseName + "-triangle-positions.bin";
 
     uint32_t iNumMeshes = (uint32_t)aaiTriangleVertexIndices.size();
     std::vector<MeshRange> aMeshTriangleRanges(iNumMeshes);
@@ -695,7 +703,7 @@ void test(
     uint32_t iTriangleStartOffset = 0;
 
     FILE* fp = fopen(fullPath.c_str(), "rb");
-    auto directoryEnd = fullPath.find_last_of("//");
+    auto directoryEnd = fullPath.find_last_of("/");
     if(directoryEnd == std::string::npos)
     {
         directoryEnd = fullPath.find_last_of("\\");
@@ -746,11 +754,11 @@ void test(
     }
 
     char szTestOutputDirectory[256];
-    sprintf(szTestOutputDirectory, "%s\\test-output", directory.c_str());
+    sprintf(szTestOutputDirectory, "%s/test-output", directory.c_str());
     std::filesystem::create_directories(szTestOutputDirectory);
 
     std::stringstream oss;
-    oss << directory << "\\test-output\\test-" << baseName << "-part-read-from-file.obj";
+    oss << directory << "/test-output/test-" << baseName << "-part-read-from-file.obj";
     saveOBJ(
         oss.str().c_str(),
         aTotalVertices,
@@ -1007,7 +1015,7 @@ bool readMaterialFile(
     aOutputMaterials.push_back(endMaterial);
 
     uint32_t iNumMaterials = (uint32_t)aOutputMaterials.size();
-    std::string outputFullPath = directory + "\\" + baseName + ".mat";
+    std::string outputFullPath = directory + "/" + baseName + ".mat";
     fp = fopen(outputFullPath.c_str(), "wb");
     //fwrite(&iNumMaterials, sizeof(uint32_t), 1, fp);
     fwrite(aOutputMaterials.data(), sizeof(OutputMaterialInfo), aOutputMaterials.size(), fp);
