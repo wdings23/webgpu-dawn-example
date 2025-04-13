@@ -549,7 +549,7 @@ namespace Render
                 
                 if(pRenderJob->mPassType == Render::PassType::DrawMeshes)
                 {
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || !defined(_MSC_VER)
                     for(uint32_t iMesh = 0; iMesh < (uint32_t)maMeshTriangleRanges.size(); iMesh++)
                     {
                         if(maiVisibilityFlags[iMesh] >= 1)
