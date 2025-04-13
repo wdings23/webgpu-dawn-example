@@ -1059,7 +1059,9 @@ int main()
     
 #else
     wgpu::RequestAdapterOptions adapterOptions = {};
+#if defined(_MSC_VER)
     adapterOptions.backendType = wgpu::BackendType::Vulkan;
+#endif // _MSC_VER
     adapterOptions.powerPreference = wgpu::PowerPreference::HighPerformance;
     adapterOptions.featureLevel = wgpu::FeatureLevel::Core;
 
@@ -1094,7 +1096,9 @@ int main()
     };
     wgpu::FeatureName aFeatureNames[] =
     {
+    #if defined(_MSC_VER)
         wgpu::FeatureName::MultiDrawIndirect
+    #endif // _MSC_VER
     };
     wgpu::Limits requireLimits = {};
     requireLimits.maxBufferSize = 1000000000;
