@@ -62,8 +62,10 @@ if(EMSCRIPTEN)
     "-sASSERTIONS"
     "-sSTACK_SIZE=1048576")
 else()
+  find_package(CURL REQUIRED)
+
   add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
   set(DAWN_FETCH_DEPENDENCIES ON)
   add_subdirectory("dawn" EXCLUDE_FROM_ALL)
-  target_link_libraries(app PRIVATE dawn::webgpu_dawn glfw webgpu_glfw)
+  target_link_libraries(app PRIVATE dawn::webgpu_dawn glfw webgpu_glfw CURL::libcurl)
 endif()
