@@ -121,6 +121,37 @@ void configureSurface()
     surface.GetCurrentTexture(&surfaceTexture);
 }
 
+#if defined(__APPLE__) && !defined(EMSCRIPTEN)
+const char shaderCode[] = R"(
+    @group(0) @binding(0) var texture : texture_2d<f32>;
+    @group(0) @binding(1) var textureSampler : sampler;
+
+    struct VertexOutput 
+    {
+        @builtin(position) pos: vec4f,
+        @location(0) uv: vec2f,
+    };
+    @vertex fn vertexMain(@builtin(vertex_index) i : u32) -> VertexOutput 
+    {
+        const pos = array(vec2f(-1, -3), vec2f(-1, 1), vec2f(3, 1));
+        const uv = array(vec2f(0, -1), vec2f(0, 1), vec2f(2, 1));
+        var output: VertexOutput;
+        output.pos = vec4f(pos[i], 0.0f, 1.0f);
+        output.uv = uv[i];        
+        
+        return output;
+    }
+    @fragment fn fragmentMain(in: VertexOutput) -> @location(0) vec4f 
+    {
+        let color: vec4f = textureSample(
+            texture,
+            textureSampler,
+            in.uv);
+
+        return color;
+    }
+)";
+#else 
 const char shaderCode[] = R"(
     @group(0) @binding(0) var texture : texture_2d<f32>;
     @group(0) @binding(1) var textureSampler : sampler;
@@ -150,6 +181,7 @@ const char shaderCode[] = R"(
         return color;
     }
 )";
+#endif // __APPLE__
 
 /*
 **
@@ -312,8 +344,9 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    //desc.mMeshFilePath = "Vinci_SurfacePro11";
-    desc.mMeshFilePath = "bistro-total";
+    desc.mMeshFilePath = "Vinci_SurfacePro11";
+    //desc.mMeshFilePath = "bistro-total";
+    //desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -538,6 +571,9 @@ void start()
 
         double xpos = 0.0, ypos = 0.0;
         glfwGetCursorPos(window, &xpos, &ypos);
+#if defined(__APPLE__) && !defined(EMSCRIPTEN)
+        ypos = (double)kHeight - ypos;
+#endif // __APPLE__
         if(giLeftButtonHeld || giRightButtonHeld)
         {
             giLastX = (int32_t)xpos;

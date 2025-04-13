@@ -640,7 +640,7 @@ namespace Render
             else if(attachmentType == "BufferInput")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-                bindingLayout.buffer.minBindingSize = 256;
+                bindingLayout.buffer.minBindingSize = 64;
                 bindingLayout.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
                 if(mType == Render::JobType::Compute)
                 {
@@ -655,7 +655,7 @@ namespace Render
             else if(attachmentType == "BufferOutput")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::Storage;
-                bindingLayout.buffer.minBindingSize = 256;
+                bindingLayout.buffer.minBindingSize = 64;
                 bindingLayout.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
                 if(mType == Render::JobType::Compute)
                 {
@@ -703,7 +703,7 @@ namespace Render
             else if(uniformType == "buffer")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-                bindingLayout.buffer.minBindingSize = 256;
+                bindingLayout.buffer.minBindingSize = 64;
             
                 if(uniformUsage == "read_write_storage")
                 {
