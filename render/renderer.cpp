@@ -301,9 +301,12 @@ namespace Render
             uint2               miTextureCoord;
             float2              mUV;
             uint32_t            miTextureID;
+            uint32_t            miPadding0;
+            uint32_t            miPadding1;
+            uint32_t            miPadding2;
         };
 
-        std::vector<TextureAtlasInfo> aTextureCoord;
+        std::vector<TextureAtlasInfo> aTextureAtlasInfo;
         std::vector<std::string> aDiffuseTextureNames;
         std::vector<std::string> aEmissiveTextureNames;
         std::vector<std::string> aSpecularTextureNames;
@@ -394,9 +397,16 @@ namespace Render
             int32_t iX = 0, iY = 0;
             int32_t iLargestHeight = 0;
             
-            for(auto const& diffuseTextureName : aDiffuseTextureNames)
+            auto copyToAtlas = [&](
+                int32_t& iX, 
+                int32_t& iY, 
+                int32_t iAtlasImageWidth,
+                int32_t iAtlasImageHeight,
+                std::string const& textureName,
+                wgpu::Texture& textureAtlas,
+                int32_t& iLargestHeight)
             {
-                std::string parsedTextureName = std::string("textures/") + diffuseTextureName;
+                std::string parsedTextureName = std::string("textures/") + textureName;
                 std::vector<char> acTextureImageData;
                 Loader::loadFile(acTextureImageData, parsedTextureName);
                 int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
@@ -409,6 +419,11 @@ namespace Render
                     4
                 );
 
+                if(aTextureAtlasInfo.size() == 54)
+                {
+                    int iDebug = 1;
+                }
+
                 if(pImageData)
                 {
                     iLargestHeight = max(iLargestHeight, iImageHeight);
@@ -416,6 +431,7 @@ namespace Render
                     {
                         iX = 0;
                         iY += iLargestHeight;
+                        iLargestHeight = 0;
                     }
 
                     wgpu::TexelCopyBufferLayout layout = {};
@@ -430,24 +446,33 @@ namespace Render
                     destination.aspect = wgpu::TextureAspect::All;
                     destination.mipLevel = 0;
                     destination.origin = {.x = (uint32_t)iX, .y = (uint32_t)iY, .z = 0};
-                    destination.texture = mDiffuseTextureAtlas;
+                    destination.texture = textureAtlas;
                     device.GetQueue().WriteTexture(
-                        &destination, 
-                        pImageData, 
-                        iImageWidth * iImageHeight * 4, 
-                        &layout, 
+                        &destination,
+                        pImageData,
+                        iImageWidth * iImageHeight * 4,
+                        &layout,
                         &extent);
-
-                    iX += iImageWidth;
-
-                    stbi_image_free(pImageData);
 
                     TextureAtlasInfo info = {};
                     info.miTextureCoord = uint2(iX, iY);
                     info.miTextureID = iAtlasIndex;
                     info.mUV = float2(float(iX) / float(iAtlasImageWidth), float(iY) / float(iAtlasImageHeight));
-                    aTextureCoord.push_back(info);
+                    info.miPadding0 = iImageWidth;
+                    info.miPadding1 = iImageHeight;
+                    aTextureAtlasInfo.push_back(info);
+
+                    iX += iImageWidth;
+
+                    stbi_image_free(pImageData);
+
+                    
                 }
+            };
+            
+            for(auto const& diffuseTextureName : aDiffuseTextureNames)
+            {
+                copyToAtlas(iX, iY, iAtlasImageWidth, iAtlasImageHeight, diffuseTextureName, mDiffuseTextureAtlas, iLargestHeight);
 
                 ++iAtlasIndex;
             }
@@ -465,6 +490,19 @@ namespace Render
         viewDesc.mipLevelCount = 1;
         viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
         mDiffuseTextureAtlasView = mDiffuseTextureAtlas.CreateView(&viewDesc);
+
+        bufferDesc = {};
+        bufferDesc.mappedAtCreation = false;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+        bufferDesc.size = sizeof(TextureAtlasInfo) * (uint32_t)aTextureAtlasInfo.size();
+        maBuffers["diffuseTextureAtlasInfoBuffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["diffuseTextureAtlasInfoBuffer"].SetLabel("Diffuse Texture Atlas Info Buffer");
+        device.GetQueue().WriteBuffer(
+            maBuffers["diffuseTextureAtlasInfoBuffer"],
+            0,
+            aTextureAtlasInfo.data(),
+            sizeof(TextureAtlasInfo)* (uint32_t)aTextureAtlasInfo.size()
+        );
 
         createRenderJobs(desc);
 

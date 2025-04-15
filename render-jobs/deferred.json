@@ -65,6 +65,13 @@
             "shader_stage" : "vertex",
             "usage": "read_only_storage",
             "external": "true"
+        },
+        {
+            "name" : "totalDiffuseTextures",
+            "type": "texture",
+            "shader_stage" : "all",
+            "usage": "texture_array",
+            "external": "true"
         }
     ],
     "BlendStates": [
