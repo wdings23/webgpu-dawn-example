@@ -20,6 +20,9 @@
 //#include <tinyexr/tinyexr.h>
 //#include <tinyexr/miniz.c>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <external/stb_image/stb_image.h>
+
 #include <utils/LogPrint.h>
 
 struct Vertex
@@ -293,6 +296,176 @@ namespace Render
 
         mpSampler = desc.mpSampler;
         
+        struct TextureAtlasInfo
+        {
+            uint2               miTextureCoord;
+            float2              mUV;
+            uint32_t            miTextureID;
+        };
+
+        std::vector<TextureAtlasInfo> aTextureCoord;
+        std::vector<std::string> aDiffuseTextureNames;
+        std::vector<std::string> aEmissiveTextureNames;
+        std::vector<std::string> aSpecularTextureNames;
+        std::vector<std::string> aNormalTextureNames;
+        {
+            std::vector<char> acTextureNames;
+            Loader::loadFile(acTextureNames, desc.mMeshFilePath + "-texture-names.tex");
+            uint32_t iDiffuseSignature = ('D') | ('F' << 8) | ('S' << 16) | ('E' << 24);
+            uint32_t iEmissiveSignature = ('E') | ('M' << 8) | ('S' << 16) | ('V' << 24);
+            uint32_t iSpecularSignature = ('S') | ('P' << 8) | ('C' << 16) | ('L' << 24);
+            uint32_t iNormalSignature = ('N') | ('R' << 8) | ('M' << 16) | ('L' << 24);
+
+            uint32_t const* piData = (uint32_t const*)acTextureNames.data();
+            char const* pcEnd = ((char const*)piData) + acTextureNames.size();
+            for(uint32_t iType = 0; iType < 4; iType++)
+            {
+                uint32_t iSignature = *piData++;
+                uint32_t iNumTextures = *piData++;
+                char const* pcChar = (char const*)piData;
+                for(uint32_t i = 0; i < iNumTextures; i++)
+                {
+                    std::vector<char> acName;
+                    while(*pcChar != '\0')
+                    {
+                        acName.push_back(*pcChar++);
+                    }
+                    acName.push_back(*pcChar++);
+
+                    std::string convertedName = std::string(acName.data());
+                    auto iter = convertedName.rfind("/");
+                    if(iter == std::string::npos)
+                    {
+                        iter = convertedName.rfind("\\");
+                    }
+
+                    std::string baseName = convertedName;
+                    if(iter != std::string::npos)
+                    {
+                        baseName = convertedName.substr(iter);
+                    }
+                    iter = baseName.rfind(".");
+                    std::string noExtension = baseName.substr(0, iter);
+                    noExtension += ".png";
+
+                    if(iSignature == iDiffuseSignature)
+                    {
+                        aDiffuseTextureNames.push_back(noExtension);
+                    }
+                    else if(iSignature == iEmissiveSignature)
+                    {
+                        aEmissiveTextureNames.push_back(noExtension);
+                    }
+                    else if(iSignature == iSpecularSignature)
+                    {
+                        aSpecularTextureNames.push_back(noExtension);
+                    }
+                    else if(iSignature == iNormalSignature)
+                    {
+                        aNormalTextureNames.push_back(noExtension);
+                    }
+                }
+                piData = (uint32_t const*)pcChar;
+                if(pcChar == pcEnd)
+                {
+                    break;
+                }
+
+            }   // for texture type
+
+            // diffuse texture atlas
+            int32_t iAtlasImageWidth = 8192;
+            int32_t iAtlasImageHeight = 8192;
+            wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+            wgpu::TextureDescriptor textureDesc = {};
+            textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+            textureDesc.dimension = wgpu::TextureDimension::e2D;
+            textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+            textureDesc.mipLevelCount = 1;
+            textureDesc.sampleCount = 1;
+            textureDesc.size.depthOrArrayLayers = 1;
+            textureDesc.size.width = iAtlasImageWidth;
+            textureDesc.size.height = iAtlasImageHeight;
+            textureDesc.viewFormatCount = 1;
+            textureDesc.viewFormats = aViewFormats;
+            mDiffuseTextureAtlas = device.CreateTexture(&textureDesc);
+
+            int32_t iAtlasIndex = 0;
+            int32_t iX = 0, iY = 0;
+            int32_t iLargestHeight = 0;
+            
+            for(auto const& diffuseTextureName : aDiffuseTextureNames)
+            {
+                std::string parsedTextureName = std::string("textures/") + diffuseTextureName;
+                std::vector<char> acTextureImageData;
+                Loader::loadFile(acTextureImageData, parsedTextureName);
+                int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
+                stbi_uc* pImageData = stbi_load_from_memory(
+                    (stbi_uc const*)acTextureImageData.data(),
+                    (int32_t)acTextureImageData.size(),
+                    &iImageWidth,
+                    &iImageHeight,
+                    &iImageComp,
+                    4
+                );
+
+                if(pImageData)
+                {
+                    iLargestHeight = max(iLargestHeight, iImageHeight);
+                    if(iX + iImageWidth >= iAtlasImageWidth)
+                    {
+                        iX = 0;
+                        iY += iLargestHeight;
+                    }
+
+                    wgpu::TexelCopyBufferLayout layout = {};
+                    layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
+                    layout.offset = 0;
+                    layout.rowsPerImage = iImageHeight;
+                    wgpu::Extent3D extent = {};
+                    extent.depthOrArrayLayers = 1;
+                    extent.width = iImageWidth;
+                    extent.height = iImageHeight;
+                    wgpu::TexelCopyTextureInfo destination = {};
+                    destination.aspect = wgpu::TextureAspect::All;
+                    destination.mipLevel = 0;
+                    destination.origin = {.x = (uint32_t)iX, .y = (uint32_t)iY, .z = 0};
+                    destination.texture = mDiffuseTextureAtlas;
+                    device.GetQueue().WriteTexture(
+                        &destination, 
+                        pImageData, 
+                        iImageWidth * iImageHeight * 4, 
+                        &layout, 
+                        &extent);
+
+                    iX += iImageWidth;
+
+                    stbi_image_free(pImageData);
+
+                    TextureAtlasInfo info = {};
+                    info.miTextureCoord = uint2(iX, iY);
+                    info.miTextureID = iAtlasIndex;
+                    info.mUV = float2(float(iX) / float(iAtlasImageWidth), float(iY) / float(iAtlasImageHeight));
+                    aTextureCoord.push_back(info);
+                }
+
+                ++iAtlasIndex;
+            }
+
+        }   // textures
+
+        wgpu::TextureViewDescriptor viewDesc = {};
+        viewDesc.arrayLayerCount = 1;
+        viewDesc.aspect = wgpu::TextureAspect::All;
+        viewDesc.baseArrayLayer = 0;
+        viewDesc.baseMipLevel = 0;
+        viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+        viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        viewDesc.label = "Diffuse Texture Atlas";
+        viewDesc.mipLevelCount = 1;
+        viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+        mDiffuseTextureAtlasView = mDiffuseTextureAtlas.CreateView(&viewDesc);
+
         createRenderJobs(desc);
 
         struct UniformData
@@ -812,6 +985,7 @@ namespace Render
             createInfo.mPipelineFilePath = pipelineFilePath;
 
             createInfo.mpSampler = desc.mpSampler;
+            createInfo.mpTotalDiffuseTextureView = &mDiffuseTextureAtlasView;
 
             aShaderModuleFilePath.push_back(pipelineFilePath);
 
@@ -868,8 +1042,8 @@ namespace Render
     {
         //wgpu::Texture& swapChainTexture = maRenderJobs["PBR Graphics"]->mOutputImageAttachments["PBR Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Composite Graphics"]->mOutputImageAttachments["Composite Output"];
-        //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
-        wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());

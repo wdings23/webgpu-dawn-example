@@ -197,6 +197,15 @@ namespace Render
                         mUniformBuffers[shaderResourceName] = createInfo.mpfnGetBuffer(iBufferSize, shaderResourceName, createInfo.mpUserData);
                     }
                 }
+                else if(shaderResourceType == "texture")
+                {
+                    std::string shaderStage = shaderResource["shader_stage"].GetString();
+                    bool bExternalTexture = false;
+                    if(shaderResource.HasMember("external"))
+                    {
+                        bExternalTexture = true;
+                    }
+                }
 
                 mUniformOrder.push_back(std::make_pair(shaderResourceName, std::make_pair(shaderResourceType, shaderUsage)));
 
@@ -694,7 +703,18 @@ namespace Render
                 bindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
                 bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
 
-                bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
+                if(uniformUsage == "texture_array")
+                {
+                    if(uniformName == "totalDiffuseTextures")
+                    {
+                        bindGroupEntry.textureView = *createInfo.mpTotalDiffuseTextureView;
+                    }
+                }
+                else
+                {
+                    bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
+                }
+                
 
                 DEBUG_PRINTF("\tgroup 1 binding %d texture \"%s\"\n",
                     (uint32_t)aaBindGroupLayoutEntries[1].size(),

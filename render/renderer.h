@@ -180,8 +180,8 @@ namespace Render
         float3                                  mCameraPosition;
         float3                                  mCameraLookAt;
 
-        std::vector<wgpu::Texture>              maDiffuseTextures;
-        wgpu::TextureView                       mDiffuseTextureArrayView;
+        wgpu::Texture                           mDiffuseTextureAtlas;
+        wgpu::TextureView                       mDiffuseTextureAtlasView;
 
     };
 
