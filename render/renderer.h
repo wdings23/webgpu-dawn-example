@@ -109,6 +109,22 @@ namespace Render
 
         MeshExtent                              mTotalMeshExtent;
 
+        struct QueueData
+        {
+            std::string         mJobName;
+            std::string         mShaderResourceName;
+            void* mpData;
+            uint32_t            miStart;
+            uint32_t            miSize;
+        };
+
+        std::vector<QueueData>                  maQueueData;
+
+        inline void addQueueData(QueueData const& data)
+        {
+            maQueueData.push_back(data);
+        }
+
     protected:
         void createRenderJobs(CreateDescriptor& desc);
 
@@ -163,6 +179,10 @@ namespace Render
 
         float3                                  mCameraPosition;
         float3                                  mCameraLookAt;
+
+        std::vector<wgpu::Texture>              maDiffuseTextures;
+        wgpu::TextureView                       mDiffuseTextureArrayView;
+
     };
 
 }   // Render

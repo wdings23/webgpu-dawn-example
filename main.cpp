@@ -76,6 +76,18 @@ std::vector<uint32_t> aiVisibilityFlags;
 std::vector<float2> gaHaltonSequence;
 std::vector<float2> gaBlueNoise;
 
+struct AOUniformData
+{
+    float mfSampleRadius;
+    float mfNumSlices;
+    float mfNumSections;
+    float mfThickness;
+    float mfMinAOPct;
+    float mfMaxAOPct;
+};
+
+AOUniformData gAOUniformData;
+
 void handleCameraMouseRotate(
     int32_t iX,
     int32_t iY,
@@ -344,9 +356,9 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    desc.mMeshFilePath = "Vinci_SurfacePro11";
-    //desc.mMeshFilePath = "bistro-total";
-    //desc.mMeshFilePath = "little-tokyo";
+    //desc.mMeshFilePath = "Vinci_SurfacePro11";
+    desc.mMeshFilePath = "bistro-total";
+    //desc.mMeshFilePath = "littlest-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -535,6 +547,66 @@ void start()
                 break;
             }
 
+            case GLFW_KEY_N:
+            {
+                gAOUniformData.mfSampleRadius = std::max(gAOUniformData.mfSampleRadius - 0.1f, 0.0f);
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Ambient Occlusion Graphics";
+                data.mShaderResourceName = "uniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(AOUniformData);
+                data.mpData = &gAOUniformData;
+
+                gRenderer.addQueueData(data);
+                break;
+            }
+
+            case GLFW_KEY_M:
+            {
+                gAOUniformData.mfSampleRadius = std::max(gAOUniformData.mfSampleRadius + 0.1f, 0.0f);
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Ambient Occlusion Graphics";
+                data.mShaderResourceName = "uniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(AOUniformData);
+                data.mpData = &gAOUniformData;
+
+                gRenderer.addQueueData(data);
+                break;
+            }
+
+            case GLFW_KEY_K:
+            {
+                gAOUniformData.mfThickness = std::max(gAOUniformData.mfThickness - 0.0001f, 0.0f);
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Ambient Occlusion Graphics";
+                data.mShaderResourceName = "uniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(AOUniformData);
+                data.mpData = &gAOUniformData;
+
+                gRenderer.addQueueData(data);
+                break;
+            }
+
+            case GLFW_KEY_L:
+            {
+                gAOUniformData.mfThickness = std::max(gAOUniformData.mfThickness + 0.0001f, 0.0f);
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Ambient Occlusion Graphics";
+                data.mShaderResourceName = "uniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(AOUniformData);
+                data.mpData = &gAOUniformData;
+
+                gRenderer.addQueueData(data);
+                break;
+            }
+
         }
 
         float3 viewDir = normalize(gCameraLookAt - gCameraPosition);
@@ -648,6 +720,22 @@ void start()
         0,
         (uint32_t)(sizeof(float2)* gaBlueNoise.size())
     );
+
+    {
+        gAOUniformData.mfSampleRadius = 2.0f;
+        gAOUniformData.mfMaxAOPct = 0.7f;
+        gAOUniformData.mfMinAOPct = 0.0f;
+        gAOUniformData.mfNumSections = 16.0f;
+        gAOUniformData.mfNumSlices = 16.0f;
+        gAOUniformData.mfThickness = 0.0015f;
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Ambient Occlusion Graphics";
+        data.mShaderResourceName = "uniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(AOUniformData);
+        data.mpData = &gAOUniformData;
+        gRenderer.addQueueData(data);
+    }
 
 #if defined(__EMSCRIPTEN__)
     emscripten_set_main_loop(render, 0, false);

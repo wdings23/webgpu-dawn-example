@@ -355,6 +355,18 @@ namespace Render
             sizeof(acClearData)
         );
 
+        for(auto queuedData : maQueueData)
+        {
+            mpDevice->GetQueue().WriteBuffer(
+                maRenderJobs[queuedData.mJobName]->mUniformBuffers[queuedData.mShaderResourceName],
+                queuedData.miStart,
+                queuedData.mpData,
+                queuedData.miSize
+            );
+        }
+
+        maQueueData.clear();
+
         struct MeshSelectionUniformData
         {
             int32_t miSelectedMesh;

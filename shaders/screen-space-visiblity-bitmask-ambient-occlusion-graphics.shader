@@ -323,7 +323,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     }   // for slice
 
     var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
-    fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
+    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
 
     return out;
