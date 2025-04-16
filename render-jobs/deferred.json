@@ -67,6 +67,13 @@
             "external": "true"
         },
         {
+            "name" : "diffuseTextureAtlasInfoBuffer",
+            "type": "buffer",
+            "shader_stage" : "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
             "name" : "totalDiffuseTextures",
             "type": "texture",
             "shader_stage" : "all",

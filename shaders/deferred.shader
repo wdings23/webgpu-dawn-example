@@ -66,6 +66,16 @@ struct SelectMeshInfo
     mMaxPosition: vec3<f32>,
 };
 
+struct TextureAtlasInfo
+{
+    miTextureCoord: vec2i,
+    mUV: vec2f,
+    miTextureID: u32,
+    miPadding0: u32,
+    miPadding1: u32,
+    miPadding2: u32,
+};
+
 @group(1) @binding(0)
 var<uniform> uniformBuffer: UniformData;
 
@@ -82,9 +92,15 @@ var<storage, read> aMeshTriangleIndexRanges: array<Range>;
 var<storage, read> aMeshExtents: array<MeshExtent>;
 
 @group(1) @binding(5)
-var<uniform> defaultUniformBuffer: DefaultUniformData;
+var<storage, read> diffuseTextureAtlasInfoBuffer: array<TextureAtlasInfo>;
 
 @group(1) @binding(6)
+var diffuseTextureAtlas: texture_2d<f32>;
+
+@group(1) @binding(7)
+var<uniform> defaultUniformBuffer: DefaultUniformData;
+
+@group(1) @binding(8)
 var textureSampler: sampler;
 
 struct VertexInput 
@@ -98,7 +114,8 @@ struct VertexOutput
     @builtin(position) pos: vec4<f32>,
     @location(0) worldPosition: vec4<f32>,
     @location(1) texCoord: vec4<f32>,
-    @location(2) normal: vec4<f32>
+    @location(2) normal: vec4<f32>,
+    @location(3) mViewPosition: vec4<f32>
 };
 struct FragmentOutput 
 {
@@ -106,7 +123,7 @@ struct FragmentOutput
     @location(1) normal: vec4<f32>,
     @location(2) mMaterial: vec4<f32>,
     @location(3) texCoordAndClipSpace: vec4<f32>,
-    @location(4) motionVector: vec4<f32>
+    @location(4) motionVector: vec4<f32>,
 };
 
 @vertex
@@ -133,6 +150,9 @@ fn vs_main(in: VertexInput,
     out.worldPosition = vec4f(worldPosition.xyz, f32(iMesh));
     out.texCoord = vec4f(in.texCoord.x, in.texCoord.y, f32(iMesh), 1.0f);
     out.normal = in.normal;
+
+    out.mViewPosition = worldPosition * defaultUniformBuffer.mViewMatrix;
+
     return out;
 }
 
@@ -187,9 +207,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         currClipSpace.x / currClipSpace.w,
         currClipSpace.y / currClipSpace.w,
         currClipSpace.z / currClipSpace.w
-    ) * 0.5f + 
-    vec3<f32>(0.5f);
-    currClipSpacePos.y = 1.0f - currClipSpacePos.y;
+    )/* * 0.5f + 
+    vec3<f32>(0.5f)*/;
+    //currClipSpacePos.y = 1.0f - currClipSpacePos.y;
 
     var prevClipSpacePos: vec3<f32> = vec3<f32>(
         prevClipSpace.x / prevClipSpace.w,
@@ -202,6 +222,9 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     out.texCoordAndClipSpace.z = currClipSpacePos.x;
     out.texCoordAndClipSpace.w = currClipSpacePos.y;
 
+    currClipSpacePos = currClipSpacePos * 0.5f + vec3<f32>(0.5f);
+    currClipSpacePos.y = 1.0f - currClipSpacePos.y;
+
     out.motionVector.x = (currClipSpacePos.x - prevClipSpacePos.x);
     out.motionVector.y = (currClipSpacePos.y - prevClipSpacePos.y);
     out.motionVector.z = floor(in.worldPosition.w + 0.5f);      // mesh id
@@ -212,9 +235,23 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     //out.clipSpace = vec4<f32>(currClipSpacePos.xyz, 1.0f);
     out.normal = vec4<f32>(normalXYZ, 1.0f);
     
+    let atlasPct: vec2f = vec2f(
+        512.0f / 8192.0f,
+        512.0f / 8192.0f
+    );
+    let iTextureID: u32 = aMaterials[iMesh].miAlbedoTextureID;
+    let textureAtlasInfo: TextureAtlasInfo = diffuseTextureAtlasInfoBuffer[iTextureID];
+    let textureUV: vec2f = textureAtlasInfo.mUV.xy + vec2f(texCoord.x, 1.0f - texCoord.y) * atlasPct.xy;
+
+    let albedo: vec4<f32> = textureSample(
+        diffuseTextureAtlas,
+        textureSampler,
+        textureUV
+    );
+
     let lightDir: vec3f = normalize(vec3f(1.0f, -1.0f, 1.0f));
-    let fDP: f32 = max(dot(normalXYZ, lightDir), 0.3f);
-    out.mMaterial = vec4f(aMaterials[iMesh].mDiffuse.xyz * fDP, 1.0f);
+    let fDP: f32 = 1.0f; // max(dot(normalXYZ, lightDir), 0.6f);
+    out.mMaterial = vec4f(aMaterials[iMesh].mDiffuse.xyz * albedo.xyz * fDP, 1.0f);
 
     // encode clip space 
     //out.worldPosition.w += currClipSpacePos.z;
