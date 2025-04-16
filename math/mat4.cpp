@@ -407,26 +407,12 @@ mat4 orthographicProjection(float fLeft,
     float afVal[16];
     memset(afVal, 0, sizeof(afVal));
     
-    afVal[0] = 2.0f / fWidth;
+    afVal[0] = -2.0f / fWidth;
     afVal[3] = -(fRight + fLeft) / (fRight - fLeft);
     afVal[5] = 2.0f / fHeight;
     afVal[7] = -(fTop + fBottom) / (fTop - fBottom);
 
-//#if defined(TARGET_IOS) || defined(__APPLE__)
-//    // metal: z -> (0, 1)
-//    // vulkan: z -> (0, 1)?
-//    
-//    afVal[10] = -1.0f / (fFar - fNear);
-//    afVal[11] = -fNear / fFarMinusNear;
-//#else
-//    
-//    // opengl: z -> (-1, 1)
-//    
-//    afVal[10] = -2.0f / fFarMinusNear;
-//    afVal[11] = -(fFar + fNear) / fFarMinusNear;
-//#endif // TARGET_IOS
-    
-    afVal[10] = 1.0f / (fFar - fNear);
+    afVal[10] = 1.0f / fFarMinusNear;
     afVal[11] = -fNear / fFarMinusNear;
 
     afVal[15] = 1.0f;

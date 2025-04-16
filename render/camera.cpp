@@ -28,7 +28,7 @@ CCamera::~CCamera()
 */
 void CCamera::update(CameraUpdateInfo& info)
 {
-    assert(info.mfFar > info.mfNear);
+    //assert(info.mfFar > info.mfNear);
     mfFar = info.mfFar;
     mfNear = info.mfNear;
 

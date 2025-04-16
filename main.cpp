@@ -78,6 +78,7 @@ std::vector<float2> gaBlueNoise;
 
 float3 gMeshMidPt;
 float gfMeshRadius;
+uint32_t giCameraMode = PROJECTION_PERSPECTIVE;
 
 struct AOUniformData
 {
@@ -312,13 +313,18 @@ void render()
         gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.001f
     );
 
-    //{
-    //    cameraInfo.mfViewWidth = gfMeshRadius * 2.5f;
-    //    cameraInfo.mfViewHeight = gfMeshRadius * 2.5f;
-    //    cameraInfo.mfNear = -gfMeshRadius * 4.0f;
-    //    cameraInfo.mfFar = gfMeshRadius * 4.0f;
-    //    gCamera.setProjectionType(ProjectionType::PROJECTION_ORTHOGRAPHIC);
-    //}
+    if(giCameraMode == ProjectionType::PROJECTION_ORTHOGRAPHIC)
+    {
+        cameraInfo.mfViewWidth = gfMeshRadius * 2.5f;
+        cameraInfo.mfViewHeight = gfMeshRadius * 2.5f;
+        cameraInfo.mfNear = gfMeshRadius * 4.0f;
+        cameraInfo.mfFar = -gfMeshRadius * 4.0f;
+        gCamera.setProjectionType(ProjectionType::PROJECTION_ORTHOGRAPHIC);
+    }
+    else
+    {
+        gCamera.setProjectionType(ProjectionType::PROJECTION_PERSPECTIVE);
+    }
 
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
@@ -377,9 +383,9 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    desc.mMeshFilePath = "Vinci_SurfacePro11";
+    //desc.mMeshFilePath = "Vinci_SurfacePro11";
     //desc.mMeshFilePath = "bistro-total";
-    //desc.mMeshFilePath = "little-tokyo";
+    desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -696,6 +702,22 @@ void start()
                 data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
                 data.mpData = &gDeferredIndirectUniformData;
                 gRenderer.addQueueData(data);
+
+                break;
+            }
+
+            case GLFW_KEY_C:
+            {
+                if(giCameraMode == PROJECTION_PERSPECTIVE)
+                {
+                    giCameraMode = PROJECTION_ORTHOGRAPHIC;
+                    
+                }
+                else
+                {
+                    giCameraMode = PROJECTION_PERSPECTIVE;
+                }
+
 
                 break;
             }
