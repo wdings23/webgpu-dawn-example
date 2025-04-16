@@ -419,11 +419,6 @@ namespace Render
                     4
                 );
 
-                if(aTextureAtlasInfo.size() == 54)
-                {
-                    int iDebug = 1;
-                }
-
                 if(pImageData)
                 {
                     iLargestHeight = max(iLargestHeight, iImageHeight);
@@ -592,11 +587,13 @@ namespace Render
             {
                 uint32_t miNumMeshes;
                 float mfExplodeMultiplier;
+                float mfCrossSectionPlaneD;
             };
 
             UniformData uniformBuffer;
             uniformBuffer.miNumMeshes = (uint32_t)maMeshTriangleRanges.size();
             uniformBuffer.mfExplodeMultiplier = mfExplosionMult;
+            uniformBuffer.mfCrossSectionPlaneD = mfCrossSectionPlaneD;
 
             mpDevice->GetQueue().WriteBuffer(
                 maRenderJobs["Deferred Indirect Graphics"]->mUniformBuffers["indirectUniformData"],
@@ -1078,9 +1075,10 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
+        wgpu::Texture& swapChainTexture = maRenderJobs["Deferred Indirect Graphics"]->mOutputImageAttachments["Material Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["PBR Graphics"]->mOutputImageAttachments["PBR Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Composite Graphics"]->mOutputImageAttachments["Composite Output"];
-        wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());

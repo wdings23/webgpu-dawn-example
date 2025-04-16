@@ -125,6 +125,8 @@ namespace Render
             maQueueData.push_back(data);
         }
 
+        float  mfCrossSectionPlaneD = 1000000.0f;
+
     protected:
         void createRenderJobs(CreateDescriptor& desc);
 
@@ -168,6 +170,7 @@ namespace Render
         SelectMeshInfo                          mSelectMeshInfo;
         
         float                                   mfExplosionMult = 1.0f;
+        
         bool                                    mbWaitingForMeshSelection = false;
         bool                                    mbUpdateUniform = false;
     

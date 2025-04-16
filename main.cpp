@@ -85,8 +85,15 @@ struct AOUniformData
     float mfMinAOPct;
     float mfMaxAOPct;
 };
-
 AOUniformData gAOUniformData;
+
+struct DeferredIndirectUniformData
+{
+    float               mfExplosionMultiplier;
+    float               mfCrossSectionPlaneD;
+};
+DeferredIndirectUniformData gDeferredIndirectUniformData;
+
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -484,8 +491,18 @@ void start()
             case GLFW_KEY_E:
             {
                 // explode mesh 
-                gfExplodeMultiplier += 1.0f;
-                gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
+                //gfExplodeMultiplier += 1.0f;
+                //gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
+
+                gDeferredIndirectUniformData.mfExplosionMultiplier += 1.0f;
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Deferred Indirect Graphics";
+                data.mShaderResourceName = "indirectUniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+                data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
 
                 break;
             }
@@ -493,10 +510,19 @@ void start()
             case GLFW_KEY_R:
             {
                 // move meshes back from explosion
-                gfExplodeMultiplier -= 1.0f;
-                gfExplodeMultiplier = std::max(gfExplodeMultiplier, 0.0f);
+                //gfExplodeMultiplier -= 1.0f;
+                //gfExplodeMultiplier = std::max(gfExplodeMultiplier, 0.0f);
+                //gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
 
-                gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
+                gDeferredIndirectUniformData.mfExplosionMultiplier = std::max(gDeferredIndirectUniformData.mfExplosionMultiplier - 1.0f, 0.0f);
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Deferred Indirect Graphics";
+                data.mShaderResourceName = "indirectUniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+                data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
 
                 break;
             }
@@ -604,6 +630,46 @@ void start()
                 data.mpData = &gAOUniformData;
 
                 gRenderer.addQueueData(data);
+                break;
+            }
+
+            case GLFW_KEY_O:
+            {
+                if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
+                {
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = 10.0f;
+                }
+
+                gDeferredIndirectUniformData.mfCrossSectionPlaneD -= 0.1f;
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Deferred Indirect Graphics";
+                data.mShaderResourceName = "indirectUniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+                data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
+
+                break;
+            }
+
+            case GLFW_KEY_P:
+            {
+                if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
+                {
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = 10.0f;
+                }
+
+                gDeferredIndirectUniformData.mfCrossSectionPlaneD += 0.1f;
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Deferred Indirect Graphics";
+                data.mShaderResourceName = "indirectUniformData";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+                data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
+
                 break;
             }
 
@@ -734,6 +800,16 @@ void start()
         data.miStart = 0;
         data.miSize = (uint32_t)sizeof(AOUniformData);
         data.mpData = &gAOUniformData;
+        gRenderer.addQueueData(data);
+
+        gDeferredIndirectUniformData.mfCrossSectionPlaneD = 100000.0f;
+        gDeferredIndirectUniformData.mfExplosionMultiplier = 0.0f;
+
+        data.mJobName = "Deferred Indirect Graphics";
+        data.mShaderResourceName = "indirectUniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+        data.mpData = &gDeferredIndirectUniformData;
         gRenderer.addQueueData(data);
     }
 
