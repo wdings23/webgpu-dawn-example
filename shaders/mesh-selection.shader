@@ -108,7 +108,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         in.uv
     );
 
-    var iMesh: i32 = i32(ceil(worldPosition.w - 0.5f));
+    var iMesh: i32 = i32(ceil(worldPosition.w - fract(worldPosition.w) - 0.5f));
     if(worldPosition.w == 0.0f)
     {
         iMesh = -1;

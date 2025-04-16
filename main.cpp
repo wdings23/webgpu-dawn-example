@@ -371,8 +371,8 @@ void initGraphics()
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
     //desc.mMeshFilePath = "Vinci_SurfacePro11";
-    desc.mMeshFilePath = "bistro-total";
-    //desc.mMeshFilePath = "little-tokyo";
+    //desc.mMeshFilePath = "bistro-total";
+    desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -551,16 +551,17 @@ void start()
                 // hide mesh
                 uint32_t iFlag = 0;
                 Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
+                DEBUG_PRINTF("selected mesh %d\n", selectionInfo.miMeshID);
                 if(selectionInfo.miMeshID >= 0)
                 {
-                    aiVisibilityFlags[selectionInfo.miMeshID - 1] = 0;
+                    aiVisibilityFlags[selectionInfo.miMeshID] = 0;
                     gRenderer.setBufferData(
                         "visibilityFlags",
                         aiVisibilityFlags.data(),
                         0,
                         uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
                     );
-                    aiHiddenMeshes.push_back(selectionInfo.miMeshID - 1);
+                    aiHiddenMeshes.push_back(selectionInfo.miMeshID);
                 }
                 break;
             }
