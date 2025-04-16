@@ -77,7 +77,7 @@ std::vector<float2> gaHaltonSequence;
 std::vector<float2> gaBlueNoise;
 
 float3 gMeshMidPt;
-float gfMeshRadiusRadius;
+float gfMeshRadius;
 
 struct AOUniformData
 {
@@ -371,8 +371,8 @@ void initGraphics()
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
     //desc.mMeshFilePath = "Vinci_SurfacePro11";
-    //desc.mMeshFilePath = "bistro-total";
-    desc.mMeshFilePath = "little-tokyo";
+    desc.mMeshFilePath = "bistro-total";
+    //desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -380,16 +380,19 @@ void initGraphics()
     createRenderPipeline();
 
     gMeshMidPt = (float3(gRenderer.mTotalMeshExtent.mMaxPosition) + float3(gRenderer.mTotalMeshExtent.mMinPosition)) * 0.5f;
-    gfMeshRadiusRadius = length(float3(gRenderer.mTotalMeshExtent.mMaxPosition) - float3(gRenderer.mTotalMeshExtent.mMinPosition)) * 0.5f;
+    gfMeshRadius = length(float3(gRenderer.mTotalMeshExtent.mMaxPosition) - float3(gRenderer.mTotalMeshExtent.mMinPosition)) * 0.5f;
 
-    gInitialCameraLookAt = gMeshMidPt;
-    gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, -1.0f) * gfMeshRadiusRadius * 1.25f;
+    if(gfMeshRadius <= 10.0f)
+    {
+        gInitialCameraLookAt = gMeshMidPt;
+        gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, -1.0f) * gfMeshRadius * 1.25f;
 
-    gCameraLookAt = gInitialCameraLookAt;
-    gCameraPosition = gInitialCameraPosition;
+        gCameraLookAt = gInitialCameraLookAt;
+        gCameraPosition = gInitialCameraPosition;
 
-    gCamera.setLookAt(gCameraLookAt);
-    gCamera.setPosition(gCameraPosition);
+        gCamera.setLookAt(gCameraLookAt);
+        gCamera.setPosition(gCameraPosition);
+    }
 }
 
 /*
