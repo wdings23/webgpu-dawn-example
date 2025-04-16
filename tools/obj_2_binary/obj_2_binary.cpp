@@ -209,6 +209,8 @@ int main(int argc, char* argv[])
     float3 totalMinPos = float3(FLT_MAX, FLT_MAX, FLT_MAX);
     float3 totalMaxPos = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
+    float fZMult = -1.0f;
+
     for(auto const& entry : std::filesystem::directory_iterator(directory))
     {
         std::string path = entry.path().string().c_str();
@@ -410,8 +412,8 @@ int main(int argc, char* argv[])
 
                     // Process vertex data (e.g., store in your data structures
                     Vertex vertex;
-                    vertex.mPosition = float4(vx, vy, -vz, (float)aMeshExtents.size());
-                    vertex.mNormal = float4(nx, ny, -nz, 1.0f);
+                    vertex.mPosition = float4(vx, vy, vz * fZMult, (float)aMeshExtents.size());
+                    vertex.mNormal = float4(nx, ny, nz * fZMult, 1.0f);
                     vertex.mUV = float4(tx, ty, (float)aMeshExtents.size(), 1.0f);
 
                     totalMinPos = fminf(totalMinPos, float3(vertex.mPosition));

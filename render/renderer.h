@@ -68,12 +68,6 @@ namespace Render
 
         void highLightSelectedMesh(int32_t iX, int32_t iY);
 
-        inline void setExplosionMultiplier(float fMult)
-        {
-            mfExplosionMult = fMult;
-            mbUpdateUniform = true;
-        }
-
         SelectMeshInfo const& getSelectionInfo();
 
         inline uint32_t getNumMeshes()
@@ -126,6 +120,8 @@ namespace Render
         }
 
         float  mfCrossSectionPlaneD = 1000000.0f;
+        float3                                  mCameraPosition;
+        float3                                  mCameraLookAt;
 
     protected:
         void createRenderJobs(CreateDescriptor& desc);
@@ -169,8 +165,6 @@ namespace Render
         
         SelectMeshInfo                          mSelectMeshInfo;
         
-        float                                   mfExplosionMult = 1.0f;
-        
         bool                                    mbWaitingForMeshSelection = false;
         bool                                    mbUpdateUniform = false;
     
@@ -179,9 +173,6 @@ namespace Render
 
 
         uint32_t*                               maiVisibilityFlags = nullptr;
-
-        float3                                  mCameraPosition;
-        float3                                  mCameraLookAt;
 
         wgpu::Texture                           mDiffuseTextureAtlas;
         wgpu::TextureView                       mDiffuseTextureAtlasView;

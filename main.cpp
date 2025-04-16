@@ -76,6 +76,9 @@ std::vector<uint32_t> aiVisibilityFlags;
 std::vector<float2> gaHaltonSequence;
 std::vector<float2> gaBlueNoise;
 
+float3 gMeshMidPt;
+float gfMeshRadiusRadius;
+
 struct AOUniformData
 {
     float mfSampleRadius;
@@ -93,6 +96,7 @@ struct DeferredIndirectUniformData
     float               mfCrossSectionPlaneD;
 };
 DeferredIndirectUniformData gDeferredIndirectUniformData;
+
 
 
 void handleCameraMouseRotate(
@@ -299,7 +303,7 @@ void render()
     CameraUpdateInfo cameraInfo = {};
     cameraInfo.mfFar = 100.0f;
     cameraInfo.mfFieldOfView = 3.14159f * 0.5f;
-    cameraInfo.mfNear = 0.01f;
+    cameraInfo.mfNear = 0.1f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
     cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
@@ -312,6 +316,9 @@ void render()
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
     gCamera.update(cameraInfo);
+
+    gRenderer.mCameraLookAt = gCameraLookAt;
+    gRenderer.mCameraPosition = gCameraPosition;
 
     Render::CRenderer::DrawUpdateDescriptor drawDesc = {};
     drawDesc.mpViewMatrix = &gCamera.getViewMatrix();
@@ -364,13 +371,22 @@ void initGraphics()
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
     //desc.mMeshFilePath = "Vinci_SurfacePro11";
-    desc.mMeshFilePath = "bistro-total";
-    //desc.mMeshFilePath = "littlest-tokyo";
+    //desc.mMeshFilePath = "bistro-total";
+    desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
     
     createRenderPipeline();
+
+    gMeshMidPt = (float3(gRenderer.mTotalMeshExtent.mMaxPosition) + float3(gRenderer.mTotalMeshExtent.mMinPosition)) * 0.5f;
+    gfMeshRadiusRadius = length(float3(gRenderer.mTotalMeshExtent.mMaxPosition) - float3(gRenderer.mTotalMeshExtent.mMinPosition)) * 0.5f;
+
+    gInitialCameraLookAt = gMeshMidPt;
+    gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, -1.0f) * gfMeshRadiusRadius * 1.25f;
+
+    gCameraLookAt = gInitialCameraLookAt;
+    gCameraPosition = gInitialCameraPosition;
 
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
@@ -1503,7 +1519,6 @@ void zoomToSelection()
 
         gState = NORMAL;
         toggleOtherVisibilityFlags(0, true);
-        gRenderer.setExplosionMultiplier(gfExplodeMultiplier);
     }
     else
     {
@@ -1542,7 +1557,6 @@ void zoomToSelection()
             gCameraAngle = float2(0.0f, 0.0f);
 
             toggleOtherVisibilityFlags(selectMeshInfo.miMeshID - 1, false);
-            gRenderer.setExplosionMultiplier(0.0f);
         }
     }
 }
