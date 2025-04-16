@@ -878,7 +878,7 @@ namespace Render
             depthStencilDesc.size.depthOrArrayLayers = 1;
             mDepthStencilTexture = createInfo.mpDevice->CreateTexture(&depthStencilDesc);
 
-            mOutputImageAttachments["Depth-Texture"] = mDepthStencilTexture;
+            mOutputImageAttachments["Depth Output"] = mDepthStencilTexture;
 
             // dpeth texture view
             wgpu::TextureViewDescriptor depthStencilViewDesc = {};

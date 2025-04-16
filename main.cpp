@@ -306,12 +306,19 @@ void render()
     cameraInfo.mfNear = 0.1f;
     cameraInfo.mfViewWidth = (float)kWidth;
     cameraInfo.mfViewHeight = (float)kHeight;
-    cameraInfo.mProjectionJitter = float2(0.0f, 0.0f);
     cameraInfo.mUp = float3(0.0f, 1.0f, 0.0f);
     cameraInfo.mProjectionJitter = float2(
-        gaHaltonSequence[gRenderer.getFrameIndex() % 64].x * 0.25f,
-        gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.25f
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].x * 0.001f,
+        gaHaltonSequence[gRenderer.getFrameIndex() % 64].y * 0.001f
     );
+
+    //{
+    //    cameraInfo.mfViewWidth = gfMeshRadius * 2.5f;
+    //    cameraInfo.mfViewHeight = gfMeshRadius * 2.5f;
+    //    cameraInfo.mfNear = -gfMeshRadius * 4.0f;
+    //    cameraInfo.mfFar = gfMeshRadius * 4.0f;
+    //    gCamera.setProjectionType(ProjectionType::PROJECTION_ORTHOGRAPHIC);
+    //}
 
     gCamera.setLookAt(gCameraLookAt);
     gCamera.setPosition(gCameraPosition);
@@ -370,9 +377,9 @@ void initGraphics()
     desc.miScreenHeight = kHeight;
     desc.mpDevice = &device;
     desc.mpInstance = &instance;
-    //desc.mMeshFilePath = "Vinci_SurfacePro11";
+    desc.mMeshFilePath = "Vinci_SurfacePro11";
     //desc.mMeshFilePath = "bistro-total";
-    desc.mMeshFilePath = "little-tokyo";
+    //desc.mMeshFilePath = "little-tokyo";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -385,7 +392,7 @@ void initGraphics()
     if(gfMeshRadius <= 10.0f)
     {
         gInitialCameraLookAt = gMeshMidPt;
-        gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, -1.0f) * gfMeshRadius * 1.25f;
+        gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, 1.0f) * gfMeshRadius * 1.25f;
 
         gCameraLookAt = gInitialCameraLookAt;
         gCameraPosition = gInitialCameraPosition;
@@ -657,7 +664,7 @@ void start()
             {
                 if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
                 {
-                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = 10.0f;
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.5f;
                 }
 
                 gDeferredIndirectUniformData.mfCrossSectionPlaneD -= 0.1f;
@@ -677,7 +684,7 @@ void start()
             {
                 if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
                 {
-                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = 10.0f;
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.5f;
                 }
 
                 gDeferredIndirectUniformData.mfCrossSectionPlaneD += 0.1f;

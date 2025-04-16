@@ -426,7 +426,7 @@ mat4 orthographicProjection(float fLeft,
 //    afVal[11] = -(fFar + fNear) / fFarMinusNear;
 //#endif // TARGET_IOS
     
-    afVal[10] = -1.0f / (fFar - fNear);
+    afVal[10] = 1.0f / (fFar - fNear);
     afVal[11] = -fNear / fFarMinusNear;
 
     afVal[15] = 1.0f;
@@ -456,16 +456,16 @@ mat4 makeViewMatrix(vec3 const& eyePos, vec3 const& lookAt, vec3 const& up)
     {
         tangent.x, tangent.y, tangent.z, 0.0f,
         binormal.x, binormal.y, binormal.z, 0.0f,
-        -dir.x, -dir.y, -dir.z, 0.0f,
+        dir.x, dir.y, dir.z, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f,
     };
     
     mat4 xform(afValue);
     
     mat4 translation;
-    translation.mafEntries[3] = -eyePos.x;
-    translation.mafEntries[7] = -eyePos.y;
-    translation.mafEntries[11] = -eyePos.z;
+    translation.mafEntries[3] = eyePos.x;
+    translation.mafEntries[7] = eyePos.y;
+    translation.mafEntries[11] = eyePos.z;
     
     return (xform * translation);
 }
