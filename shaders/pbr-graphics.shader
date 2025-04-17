@@ -135,7 +135,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         albedo.xyz,
         0.1f,
         material.mSpecular.x);
-    color = clamp(color + vec3f(0.0f, 0.1f, 0.1f), vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f));
+    color = clamp(color + vec3f(0.1f, 0.1f, 0.1f), vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f));
 
     out.mOutput = vec4f(color.x, color.y, color.z, 1.0f);
 
@@ -232,9 +232,9 @@ fn pbr(worldPosition: vec3f,
     var color: vec3f = ambient + Lo;
 
     // HDR tonemapping
-    //color = color / (color + vec3f(1.0f, 1.0f, 1.0f));
+    color = color / (color + vec3f(1.0f, 1.0f, 1.0f));
     // gamma correct
-    //color = pow(color, vec3f(1.0f/2.2f, 1.0f / 2.2f, 1.0f / 2.2f)); 
+    color = pow(color, vec3f(1.0f/2.2f, 1.0f / 2.2f, 1.0f / 2.2f)); 
 
     return color;
 }
