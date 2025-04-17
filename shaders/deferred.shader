@@ -163,7 +163,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     
     let diffuseAtlasTextureSize: vec2u = textureDimensions(diffuseTextureAtlas);
     
-    var planeNormal: vec3f = vec3f(0.0f, 1.0f, 0.0f);
+    var planeNormal: vec3f = vec3f(-1.0f, 0.0f, 0.0f);
     var fPlaneD: f32 = -uniformBuffer.mfCrossSectionPlaneD;
 
     var fDistanceToPlane = dot(planeNormal, in.worldPosition.xyz) + fPlaneD;

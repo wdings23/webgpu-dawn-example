@@ -21,6 +21,12 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "Cross Section Graphics",
+            "Pipeline": "cross-section-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "PBR Graphics",
             "Pipeline": "pbr-graphics.json",
             "Type": "Graphics",

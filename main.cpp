@@ -385,8 +385,8 @@ void initGraphics()
     desc.mpInstance = &instance;
     //desc.mMeshFilePath = "Vinci_SurfacePro11";
     //desc.mMeshFilePath = "bistro-total";
-    desc.mMeshFilePath = "little-tokyo";
-    //desc.mMeshFilePath = "ICE1";
+    //desc.mMeshFilePath = "little-tokyo";
+    desc.mMeshFilePath = "ICE1";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -861,6 +861,7 @@ void start()
         data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
         data.mpData = &gDeferredIndirectUniformData;
         gRenderer.addQueueData(data);
+
     }
 
 #if defined(__EMSCRIPTEN__)

@@ -45,6 +45,9 @@ var pbrTexture: texture_2d<f32>;
 @group(0) @binding(2)
 var selectionTexture: texture_2d<f32>;
 
+@group(0) @binding(3)
+var crossSectionTexture: texture_2d<f32>;
+
 @group(1) @binding(0)
 var<uniform> defaultUniformBuffer: DefaultUniformData;
 
@@ -82,7 +85,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         selectionTexture,
         textureSampler,
         in.uv
-    );
+    ) +
+    textureSample(
+        crossSectionTexture,
+        textureSampler,
+        in.uv);
     out.mCompositeOutput.w = 1.0f;
 
     return out;

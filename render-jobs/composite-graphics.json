@@ -23,6 +23,11 @@
             "Name" : "Selection Output",
             "Type": "TextureInput",
             "ParentJob": "Mesh Selection Graphics"
+        },
+        {
+            "Name" : "Slice Output",
+            "Type": "TextureInput",
+            "ParentJob": "Cross Section Graphics"
         }
     ],
     "ShaderResources": [

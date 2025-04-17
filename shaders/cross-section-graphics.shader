@@ -152,20 +152,22 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         up = vec3f(1.0f, 0.0f, 0.0f);
     }
 
-    let tangent: vec3f = cross(up, worldPositionToEye);
-    let binormal: vec3f = cross(worldPositionToEye, tangent);
+    let eyeDir: vec3f = normalize(defaultUniformBuffer.mCameraLookAt.xyz - defaultUniformBuffer.mCameraPosition.xyz);
+
+    let tangent: vec3f = cross(up, eyeDir);
+    let binormal: vec3f = cross(eyeDir, tangent);
     var viewSpaceNormal: vec3f = vec3f(
         dot(tangent.xyz, normal.xyz),
         dot(binormal.xyz, normal.xyz),
-        dot(worldPositionToEye.xyz, normal.xyz)
+        dot(eyeDir.xyz, normal.xyz)
     );
 
-    let eyeDir: vec3f = normalize(defaultUniformBuffer.mCameraLookAt.xyz - defaultUniformBuffer.mCameraPosition.xyz);
+    
     let fDP: f32 = dot(eyeDir, viewSpaceNormal.xyz);
 
     out.mDebug0 = vec4f(viewSpaceNormal.xyz, 1.0f);
 
-    if(viewSpaceNormal.z <= 0.0f)
+    if(viewSpaceNormal.z <= -0.05f)
     {
         out.mOutput = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
     }
