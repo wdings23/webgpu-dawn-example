@@ -204,7 +204,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
         1.0f / f32(textureSize.x), 
         1.0f / f32(textureSize.y)) * fSampleRadius;
 
-    let viewPosition: vec3f = worldPosition.xyz - cameraPosition;
+    let viewPosition: vec3f = cameraPosition - worldPosition.xyz;
     var viewDirection: vec3f = normalize(viewPosition * -1.0f);
 
     // sample multiple slices around the view direction
@@ -270,10 +270,10 @@ fn ao(in: VertexOutput) -> FragmentOutput
                     continue;
                 }
 
-                let sampleViewPosition: vec3f = sampleWorldPosition.xyz - cameraPosition;
+                let sampleViewPosition: vec3f = cameraPosition - sampleWorldPosition.xyz;
 
                 // sample view position - current view position
-                let deltaViewSpacePosition: vec3f = sampleViewPosition.xyz - viewPosition.xyz;
+                let deltaViewSpacePosition: vec3f = viewPosition.xyz - sampleViewPosition.xyz;
                 let fDeltaViewSpaceLength: f32 = dot(deltaViewSpacePosition, deltaViewSpacePosition);
                 
                 // front and back horizon angle

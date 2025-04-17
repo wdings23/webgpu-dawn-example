@@ -546,6 +546,7 @@ namespace Render
         defaultUniformData.miFrame = miFrame;
         defaultUniformData.mCameraPosition = float4(mCameraPosition, 1.0f);
         defaultUniformData.mCameraLookDir = float4(mCameraLookAt, 1.0f);
+        defaultUniformData.miNumMeshes = (uint32_t)maMeshTriangleRanges.size();
 
         // update default uniform buffer
         mpDevice->GetQueue().WriteBuffer(

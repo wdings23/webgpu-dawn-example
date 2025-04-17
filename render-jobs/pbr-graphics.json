@@ -32,6 +32,20 @@
             "shader_stage" : "vertex",
             "usage": "read_only_storage",
             "external": "true"
+        },
+        {
+            "name" : "meshMaterials",
+            "type": "buffer",
+            "shader_stage" : "all",
+            "usage": "read_only_storage",
+            "external": "true"
+        },
+        {
+            "name" : "meshMaterialIDs",
+            "type": "buffer",
+            "shader_stage" : "all",
+            "usage": "read_only_storage",
+            "external": "true"
         }
     ],
     "BlendStates": [

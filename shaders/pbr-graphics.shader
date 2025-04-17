@@ -33,6 +33,18 @@ struct MeshExtent
     mMaxPosition: vec4<f32>,
 };
 
+struct Material
+{
+    mDiffuse: vec4<f32>,
+    mSpecular: vec4<f32>,
+    mEmissive: vec4<f32>,
+
+    miID: u32,
+    miAlbedoTextureID: u32,
+    miNormalTextureID: u32,
+    miEmissiveTextureID: u32
+};
+
 @group(0) @binding(0)
 var worldPositionTexture: texture_2d<f32>;
 
@@ -46,9 +58,15 @@ var materialOutputTexture: texture_2d<f32>;
 var<storage, read> aMeshExtents: array<MeshExtent>;
 
 @group(1) @binding(1)
-var<uniform> defaultUniformBuffer: DefaultUniformData;
+var<storage, read> aMeshMaterials: array<Material>;
 
 @group(1) @binding(2)
+var<storage, read> aiMeshMaterialID: array<u32>;
+
+@group(1) @binding(3)
+var<uniform> defaultUniformBuffer: DefaultUniformData;
+
+@group(1) @binding(4)
 var textureSampler: sampler;
 
 struct VertexOutput 
@@ -108,13 +126,16 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         0
     );
 
+    let iMaterialID: u32 = aiMeshMaterialID[iMesh];
+    let material: Material = aMeshMaterials[iMaterialID];
+
     var color = pbr(
         worldPosition.xyz,
         normal.xyz,
         albedo.xyz,
-        0.2f,
-        0.4f);
-    color = clamp(color + vec3f(0.4f, 0.4f, 0.4f), vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f));
+        0.1f,
+        material.mSpecular.x);
+    color = clamp(color + vec3f(0.0f, 0.1f, 0.1f), vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f));
 
     out.mOutput = vec4f(color.x, color.y, color.z, 1.0f);
 
@@ -146,19 +167,19 @@ fn pbr(worldPosition: vec3f,
     let totalSize: f32 = length(totalMeshExtent.mMaxPosition.xyz - totalMeshExtent.mMinPosition.xyz);
 
     var lightPositions: array<vec3f, 4>;
-    lightPositions[0] = totalCenter + vec3f(0.0f, 1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f);
-    lightPositions[1] = totalCenter + vec3f(1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f);
-    lightPositions[2] = totalCenter + vec3f(-1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f, -1.0f * totalSize * 0.25f);
-    lightPositions[3] = totalCenter + vec3f(0.0f, 1.0f * totalSize * 0.5f, -1.0f * totalSize * 0.25f);
-    
-    let fLightRadiance: f32 = 0.6f;
+    lightPositions[0] = totalCenter + vec3f(0.0f, 0.0f, -2.0f * totalSize);
+    lightPositions[1] = totalCenter + vec3f(-2.0f * totalSize, 1.0f * totalSize, 0.0f);
+    lightPositions[2] = totalCenter + vec3f(2.0f * totalSize, 1.0f * totalSize, 0.0f);
+    lightPositions[3] = totalCenter + vec3f(0.0f, 0.0f, 2.0f * totalSize);
+
+    let fLightRadiance: f32 = 30.0f;
     var lightColors: array<vec3f, 4>;
     lightColors[0] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
     lightColors[1] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
     lightColors[2] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
     lightColors[3] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
 
-    let view: vec3f = normalize(defaultUniformBuffer.mCameraPosition.xyz - worldPosition);
+    let view: vec3f = normalize(worldPosition - defaultUniformBuffer.mCameraPosition.xyz);
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
@@ -167,7 +188,7 @@ fn pbr(worldPosition: vec3f,
 
     // reflectance equation
     var Lo: vec3f = vec3f(0.0f, 0.0f, 0.0f);
-    for(var i: i32 = 0; i < 4; i += 1) 
+    for(var i: i32 = 0; i < 3; i += 1) 
     {
         // calculate per-light radiance
         let L: vec3f = normalize(lightPositions[i] - worldPosition);
@@ -201,6 +222,7 @@ fn pbr(worldPosition: vec3f,
 
         // add to outgoing radiance Lo
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+
     }   
     
     // ambient lighting (note that the next IBL tutorial will replace 
@@ -210,9 +232,9 @@ fn pbr(worldPosition: vec3f,
     var color: vec3f = ambient + Lo;
 
     // HDR tonemapping
-    color = color / (color + vec3f(1.0f, 1.0f, 1.0f));
+    //color = color / (color + vec3f(1.0f, 1.0f, 1.0f));
     // gamma correct
-    color = pow(color, vec3f(1.0f/2.2f, 1.0f / 2.2f, 1.0f / 2.2f)); 
+    //color = pow(color, vec3f(1.0f/2.2f, 1.0f / 2.2f, 1.0f / 2.2f)); 
 
     return color;
 }

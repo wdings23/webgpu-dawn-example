@@ -78,7 +78,7 @@ std::vector<float2> gaBlueNoise;
 
 float3 gMeshMidPt;
 float gfMeshRadius;
-uint32_t giCameraMode = PROJECTION_PERSPECTIVE;
+uint32_t giCameraMode = PROJECTION_ORTHOGRAPHIC;
 
 struct AOUniformData
 {
