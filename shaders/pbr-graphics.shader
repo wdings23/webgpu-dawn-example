@@ -21,7 +21,7 @@ struct DefaultUniformData
     mPrevJitteredViewProjectionMatrix: mat4x4<f32>,
 
     mCameraPosition: vec4<f32>,
-    mCameraLookDir: vec4<f32>,
+    mCameraLookAt: vec4<f32>,
 
     mLightRadiance: vec4<f32>,
     mLightDirection: vec4<f32>,
@@ -102,14 +102,31 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         0
     );
 
+    let albedo: vec4f = textureLoad(
+        materialOutputTexture,
+        screenCoord,
+        0
+    );
+
     var color = pbr(
         worldPosition.xyz,
         normal.xyz,
+        albedo.xyz,
         0.2f,
         0.4f);
     color = clamp(color + vec3f(0.4f, 0.4f, 0.4f), vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f));
 
     out.mOutput = vec4f(color.x, color.y, color.z, 1.0f);
+
+    //let diff: vec3f = normalize(worldPosition.xyz - defaultUniformBuffer.mCameraPosition.xyz);
+    //let diff: vec3f = normalize(defaultUniformBuffer.mCameraLookAt.xyz - defaultUniformBuffer.mCameraPosition.xyz);
+    //let fViewNormalDP: f32 = dot(diff, normal.xyz);
+    //if(fViewNormalDP > 0.1f)
+    //{
+    //    out.mOutput = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
+    //}
+
+
     return out;
 }
 
@@ -118,10 +135,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
 */
 fn pbr(worldPosition: vec3f,
        normal: vec3f, 
+       albedoColor: vec3f,
        roughness: f32,
        metallic: f32) -> vec3f
 {
-    let albedo: vec3f = vec3f(0.7f, 0.7f, 0.7f);
+    let albedo: vec3f = albedoColor;
 
     let totalMeshExtent: MeshExtent = aMeshExtents[defaultUniformBuffer.miNumMeshes];
     let totalCenter: vec3f = (totalMeshExtent.mMaxPosition.xyz + totalMeshExtent.mMinPosition.xyz) * 0.5f;
@@ -132,12 +150,13 @@ fn pbr(worldPosition: vec3f,
     lightPositions[1] = totalCenter + vec3f(1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f);
     lightPositions[2] = totalCenter + vec3f(-1.0f * totalSize * 0.25f, 1.0f * totalSize * 0.25f, -1.0f * totalSize * 0.25f);
     lightPositions[3] = totalCenter + vec3f(0.0f, 1.0f * totalSize * 0.5f, -1.0f * totalSize * 0.25f);
-
+    
+    let fLightRadiance: f32 = 0.6f;
     var lightColors: array<vec3f, 4>;
-    lightColors[0] = vec3f(100.0f, 100.0f, 100.0f);
-    lightColors[1] = vec3f(100.0f, 100.0f, 100.0f);
-    lightColors[2] = vec3f(100.0f, 100.0f, 100.0f);
-    lightColors[3] = vec3f(100.0f, 100.0f, 100.0f);
+    lightColors[0] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
+    lightColors[1] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
+    lightColors[2] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
+    lightColors[3] = vec3f(fLightRadiance, fLightRadiance, fLightRadiance);
 
     let view: vec3f = normalize(defaultUniformBuffer.mCameraPosition.xyz - worldPosition);
 

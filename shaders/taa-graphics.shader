@@ -143,8 +143,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         prevUV
     ).xyz;
     var lerpOutput: vec3<f32> = mix(
-        //clamp(prevRadiance, minRadiance, maxRadiance),
-        clamp(totalPrevRadiance.xyz / fTotalPrevWeight, minRadiance, maxRadiance),
+        clamp(prevRadiance, minRadiance, maxRadiance),
+        //clamp(totalPrevRadiance.xyz / fTotalPrevWeight, minRadiance, maxRadiance),
         //radiance.xyz,
         totalRadiance.xyz / fTotalPrevWeight,
         (1.0f / NUM_HISTORY)

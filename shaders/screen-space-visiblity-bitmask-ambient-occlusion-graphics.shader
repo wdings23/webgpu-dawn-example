@@ -21,15 +21,12 @@ struct FragmentOutput
 
 struct UniformData
 {
-    miFrame: u32,
-    miScreenWidth: u32,
-    miScreenHeight: u32,
-    mfRand: f32,
-
-    mViewProjectionMatrix: mat4x4<f32>,
-    
-    miStep: u32,
-
+    mfSampleRadius: f32,
+    mfNumSlices: f32,
+    mfNumSections: f32,
+    mfThickness: f32,
+    mfMinAOPct: f32,
+    mfMaxAOPct: f32,
 };
 
 struct RandomResult 
@@ -157,7 +154,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
 
     let kiNumSections: u32 = 16u;
     let kiNumSlices: u32 = 16u;
-    let kfThickness: f32 = 0.01f;
+    var kfThickness: f32 = 0.01f;
 
     let screenCoord: vec2i = vec2i(
         i32(in.uv.x * f32(defaultUniformBuffer.miScreenWidth)),
@@ -197,7 +194,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     let cameraPosition: vec3f = defaultUniformBuffer.mCameraPosition.xyz;
     var viewSpaceNormal: vec4f = vec4f(normal.xyz, 1.0f) * viewMatrix;
     viewSpaceNormal.z = -viewSpaceNormal.z;
-    let fSampleRadius: f32 = 1.0f;
+    let fSampleRadius: f32 = uniformData.mfSampleRadius;
 
     var iBlueNoiseIndex: i32 = (screenCoord.y * defaultUniformBuffer.miScreenWidth + screenCoord.x/* + defaultUniformBuffer.miFrame*/) % 128;
     let fRadius: f32 = blueNoiseBuffer[iBlueNoiseIndex].x * fSampleRadius;
@@ -280,7 +277,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 let fDeltaViewSpaceLength: f32 = dot(deltaViewSpacePosition, deltaViewSpacePosition);
                 
                 // front and back horizon angle
-                let backDeltaViewPosition: vec3f = deltaViewSpacePosition - viewDirection * kfThickness;
+                let backDeltaViewPosition: vec3f = deltaViewSpacePosition - viewDirection * uniformData.mfThickness;
                 var fHorizonAngleFront: f32 = dot(deltaViewSpacePosition / (fDeltaViewSpaceLength + 0.0001f), viewDirection);
                 var fHorizonAngleBack: f32 = dot(normalize(backDeltaViewPosition), viewDirection);
 
@@ -323,7 +320,11 @@ fn ao(in: VertexOutput) -> FragmentOutput
     }   // for slice
 
     var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
-    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO));
+    let fMin: f32 = 0.0f;
+    let fMax: f32 = 0.7f;
+    fAO = (clamp(fAO, fMin, fMax) - fMin) / (fMax - fMin);
+    
+    //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO)));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
 
     return out;
