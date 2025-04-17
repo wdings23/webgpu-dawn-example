@@ -27,6 +27,18 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "Deferred Indirect Front Face Graphics",
+            "Pipeline": "deferred-front-face.json",
+            "Type": "Graphics",
+            "PassType": "Draw Meshes"
+        },
+        {
+            "Name": "Cross Section Cleanup Graphics",
+            "Pipeline": "cross-section-cleanup-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "PBR Graphics",
             "Pipeline": "pbr-graphics.json",
             "Type": "Graphics",

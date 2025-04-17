@@ -167,7 +167,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
 
     out.mDebug0 = vec4f(viewSpaceNormal.xyz, 1.0f);
 
-    if(viewSpaceNormal.z <= -0.05f)
+    if(viewSpaceNormal.z <= 0.0f)
     {
         out.mOutput = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
     }

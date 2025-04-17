@@ -537,6 +537,9 @@ void start()
                 data.mpData = &gDeferredIndirectUniformData;
                 gRenderer.addQueueData(data);
 
+                data.mJobName = "Deferred Indirect Front Face Graphics";
+                gRenderer.addQueueData(data);
+
                 break;
             }
 
@@ -555,6 +558,9 @@ void start()
                 data.miStart = 0;
                 data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
                 data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
+
+                data.mJobName = "Deferred Indirect Front Face Graphics";
                 gRenderer.addQueueData(data);
 
                 break;
@@ -684,6 +690,9 @@ void start()
                 data.mpData = &gDeferredIndirectUniformData;
                 gRenderer.addQueueData(data);
 
+                data.mJobName = "Deferred Indirect Front Face Graphics";
+                gRenderer.addQueueData(data);
+
                 break;
             }
 
@@ -702,6 +711,9 @@ void start()
                 data.miStart = 0;
                 data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
                 data.mpData = &gDeferredIndirectUniformData;
+                gRenderer.addQueueData(data);
+
+                data.mJobName = "Deferred Indirect Front Face Graphics";
                 gRenderer.addQueueData(data);
 
                 break;
@@ -860,6 +872,9 @@ void start()
         data.miStart = 0;
         data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
         data.mpData = &gDeferredIndirectUniformData;
+        gRenderer.addQueueData(data);
+
+        data.mJobName = "Deferred Indirect Front Face Graphics";
         gRenderer.addQueueData(data);
 
     }

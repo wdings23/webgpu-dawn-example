@@ -98,6 +98,8 @@ namespace Render
 
                 mOutputImageAttachments[attachmentName] = createInfo.mpDevice->CreateTexture(&textureDescriptor);
 
+                mOutputImageAttachments[attachmentName].SetLabel(std::string(mName + "-" + attachmentName).c_str());
+
                 // save format
                 wgpu::ColorTargetState targetState = {};
                 targetState.format = format;
@@ -496,13 +498,19 @@ namespace Render
             if(attachmentType == "TextureInput" || attachmentType == "TextureInputOutput")
             {
                 std::string attachmentName = attachment["Name"].GetString();
+                std::string parentAttachmentName = attachmentName;
+                if(attachment.HasMember("ParentName"))
+                {
+                    parentAttachmentName = attachment["ParentName"].GetString();
+                }
+
                 std::string attachmentParentJobName = attachment["ParentJob"].GetString();
 
                 for(auto const& renderJob : aRenderJobs)
                 {
                     if(attachmentParentJobName == renderJob->mName)
                     {
-                        if(renderJob->mOutputImageAttachments.find(attachmentName) != renderJob->mOutputImageAttachments.end())
+                        if(renderJob->mOutputImageAttachments.find(parentAttachmentName) != renderJob->mOutputImageAttachments.end())
                         {
                             if(attachmentName == "Depth Output" && mPassType == PassType::DrawMeshes)
                             {
@@ -511,7 +519,7 @@ namespace Render
                             }
                             else
                             {
-                                mInputImageAttachments[attachmentName] = &renderJob->mOutputImageAttachments[attachmentName];
+                                mInputImageAttachments[attachmentName] = &renderJob->mOutputImageAttachments[parentAttachmentName];
                             }
 
                             break;

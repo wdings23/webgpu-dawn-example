@@ -1,12 +1,4 @@
-struct VertexOutput 
-{
-    @builtin(position) pos: vec4f,
-    @location(0) uv: vec2f,
-};
-struct FragmentOutput 
-{
-    @location(0) mCompositeOutput: vec4<f32>,
-};
+const PI: f32 = 3.14159f;
 
 struct DefaultUniformData
 {
@@ -29,23 +21,19 @@ struct DefaultUniformData
     mPrevJitteredViewProjectionMatrix: mat4x4<f32>,
 
     mCameraPosition: vec4<f32>,
-    mCameraLookDir: vec4<f32>,
+    mCameraLookAt: vec4<f32>,
 
     mLightRadiance: vec4<f32>,
     mLightDirection: vec4<f32>,
 };
 
-
 @group(0) @binding(0)
-var ambientOcclusionTexture: texture_2d<f32>;
+var worldPositionNoBackFaceTexture: texture_2d<f32>;
 
 @group(0) @binding(1)
-var pbrTexture: texture_2d<f32>;
+var worldPositionWithBackFaceTexture: texture_2d<f32>;
 
 @group(0) @binding(2)
-var selectionTexture: texture_2d<f32>;
-
-@group(0) @binding(3)
 var crossSectionTexture: texture_2d<f32>;
 
 @group(1) @binding(0)
@@ -53,6 +41,17 @@ var<uniform> defaultUniformBuffer: DefaultUniformData;
 
 @group(1) @binding(1)
 var textureSampler: sampler;
+
+struct VertexOutput 
+{
+    @builtin(position) pos: vec4f,
+    @location(0) uv: vec2f,
+};
+
+struct FragmentOutput 
+{
+    @location(0) mOutput : vec4<f32>,
+};
 
 @vertex
 fn vs_main(@builtin(vertex_index) i : u32) -> VertexOutput 
@@ -71,33 +70,33 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
 {
     var out: FragmentOutput;
 
-    out.mCompositeOutput = textureSample(
-        ambientOcclusionTexture,
-        textureSampler,
-        in.uv
-    ) * 
-    textureSample(
-        pbrTexture,
-        textureSampler,
-        in.uv
-    ) *
-    textureSample(
-        selectionTexture,
-        textureSampler,
-        in.uv
+    let screenCoord: vec2i = vec2i(
+        i32(f32(defaultUniformBuffer.miScreenWidth) * in.uv.x),
+        i32(f32(defaultUniformBuffer.miScreenHeight) * in.uv.y) 
     );
-    let crossSection: vec4f = textureSample(
+    let worldPositionNoBackFace: vec4f = textureLoad(
+        worldPositionNoBackFaceTexture,
+        screenCoord,
+        0
+    );
+    let worldPositionWithBackFace: vec4f = textureLoad(
+        worldPositionWithBackFaceTexture,
+        screenCoord,
+        0
+    );
+    let crossSection: vec4f = textureLoad(
         crossSectionTexture,
-        textureSampler,
-        in.uv);
+        screenCoord,
+        0
+    );
+    out.mOutput = crossSection;
 
-    // any back facing fragment is marked for cross section
-    if(crossSection.w > 0.0f)
+    let diff: vec3f = worldPositionNoBackFace.xyz - worldPositionWithBackFace.xyz;
+    if(dot(diff, diff) >= 1.0e-10f)
     {
-        out.mCompositeOutput = crossSection;
+        out.mOutput = vec4f(0.0f, 0.0f, 0.0f, 0.0f);
     }
-
-    out.mCompositeOutput.w = 1.0f;
 
     return out;
 }
+

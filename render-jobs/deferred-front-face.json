@@ -96,7 +96,7 @@
     "RasterState":
     {
         "FillMode": "Solid",
-        "CullMode": "None",
+        "CullMode": "Front",
         "FrontFace": "CounterClockwise"
     },
     "VertexFormat":
