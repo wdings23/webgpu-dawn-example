@@ -844,7 +844,7 @@ namespace Render
 
         // pipeline layout
         wgpu::PipelineLayoutDescriptor layoutDesc = {};
-        layoutDesc.bindGroupLayoutCount = (uint32_t)aBindGroupLayout.size();;
+        layoutDesc.bindGroupLayoutCount = (uint32_t)aBindGroupLayout.size();
         layoutDesc.bindGroupLayouts = aBindGroupLayout.data();
         wgpu::PipelineLayout pipelineLayout = createInfo.mpDevice->CreatePipelineLayout(&layoutDesc);
 

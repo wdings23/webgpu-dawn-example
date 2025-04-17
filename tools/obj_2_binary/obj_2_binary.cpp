@@ -222,6 +222,26 @@ int main(int argc, char* argv[])
             continue;
         }
 
+        auto parseBaseName = [](std::string const& filePath)
+        {
+            auto baseNameStart = filePath.rfind("\\");
+            if(baseNameStart == std::string::npos)
+            {
+                baseNameStart = filePath.rfind("/");
+            }
+            if(baseNameStart == std::string::npos)
+            {
+                baseNameStart = 0;
+            }
+            else
+            {
+                baseNameStart += 1;
+            }
+            std::string baseName = filePath.substr(baseNameStart);
+
+            return baseName;
+        };
+
         std::string baseName = fileName.substr(0, extensionIter);
 
         tinyobj::attrib_t attrib;
@@ -239,6 +259,7 @@ int main(int argc, char* argv[])
             directory.c_str());
 
         // Access loaded data
+        uint32_t iCurrMaterial = 0;
         for(size_t s = 0; s < shapes.size(); s++)
         {
             std::ostringstream partNameStringStream;
@@ -249,7 +270,6 @@ int main(int argc, char* argv[])
             if(materials.size() > 0)
             {
                 int32_t iMaterialID = shapes[s].mesh.material_ids[0];
-
                 material.mDiffuse = float4(
                     (float)materials[iMaterialID].diffuse[0], 
                     (float)materials[iMaterialID].diffuse[0], 
@@ -269,26 +289,6 @@ int main(int argc, char* argv[])
                 material.mEmissiveTexturePath = materials[iMaterialID].emissive_texname;
                 material.mSpecularTexturePath = materials[iMaterialID].specular_texname;
                 material.mNormalTexturePath = materials[iMaterialID].normal_texname;
-
-                auto parseBaseName = [](std::string const& filePath)
-                {
-                    auto baseNameStart = filePath.rfind("\\");
-                    if(baseNameStart == std::string::npos)
-                    {
-                        baseNameStart = filePath.rfind("/");
-                    }
-                    if(baseNameStart == std::string::npos)
-                    {
-                        baseNameStart = 0;
-                    }
-                    else
-                    {
-                        baseNameStart += 1;
-                    }
-                    std::string baseName = filePath.substr(baseNameStart);
-
-                    return baseName;
-                };
 
                 // save material texture name and set material id
                 {
@@ -374,9 +374,128 @@ int main(int argc, char* argv[])
 
             // Loop over faces(polygon)
             size_t index_offset = 0;
+            uint32_t iCurrMaterial = UINT32_MAX;
             for(size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
             {
                 int fv = shapes[s].mesh.num_face_vertices[f];
+                int32_t iMaterial = shapes[s].mesh.material_ids[f];
+                if(iCurrMaterial == UINT32_MAX)
+                {
+                    iCurrMaterial = iMaterial;
+                }
+                if(iMaterial != iCurrMaterial)
+                {
+                    assert(aiVertexIndices.size() % 3 == 0);
+                    aaiTriangleVertexIndices.push_back(aiVertexIndices);
+                    aiVertexIndices.clear();
+
+                    MeshExtent meshExtent;
+                    meshExtent.mMinPosition = float4(minPosition.x, minPosition.y, minPosition.z, 1.0f);
+                    meshExtent.mMaxPosition = float4(maxPosition.x, maxPosition.y, maxPosition.z, 1.0f);
+
+                    aMeshExtents.push_back(meshExtent);
+
+                    float3 center = (maxPosition + minPosition) * 0.5f;
+                    aMeshCenters.push_back(center);
+
+                    float3 bbox = maxPosition - minPosition;
+                    aMeshBBoxes.push_back(bbox);
+
+                    maxPosition = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+                    minPosition = float3(FLT_MAX, FLT_MAX, FLT_MAX);
+
+                    aVertices.clear();
+
+                    int32_t iMaterialID = shapes[s].mesh.material_ids[f];
+                    material.mDiffuse = float4(
+                        (float)materials[iMaterialID].diffuse[0],
+                        (float)materials[iMaterialID].diffuse[0],
+                        (float)materials[iMaterialID].diffuse[0], 1.0f);
+
+                    material.mSpecular = float4(
+                        (float)materials[iMaterialID].specular[0],
+                        (float)materials[iMaterialID].specular[0],
+                        (float)materials[iMaterialID].specular[0], 1.0f);
+
+                    material.mEmissive = float4(
+                        (float)materials[iMaterialID].emission[0],
+                        (float)materials[iMaterialID].emission[0],
+                        (float)materials[iMaterialID].emission[0], 1.0f);
+
+                    material.mAlbedoTexturePath = materials[iMaterialID].diffuse_texname;
+                    material.mEmissiveTexturePath = materials[iMaterialID].emissive_texname;
+                    material.mSpecularTexturePath = materials[iMaterialID].specular_texname;
+                    material.mNormalTexturePath = materials[iMaterialID].normal_texname;
+
+                    // save material texture name and set material id
+                    {
+                        if(materials[iMaterialID].diffuse_texname.length() > 0)
+                        {
+                            std::string baseName = parseBaseName(materials[iMaterialID].diffuse_texname);
+                            if(aDiffuseTextureNameMap.find(baseName) == aDiffuseTextureNameMap.end())
+                            {
+                                aDiffuseTextureNameMap[baseName] = (uint32_t)aDiffuseTextureNames.size();
+                                material.miDiffuseTextureID = (uint32_t)aDiffuseTextureNames.size();
+                                aDiffuseTextureNames.push_back(baseName);
+                            }
+                            else
+                            {
+                                material.miDiffuseTextureID = aDiffuseTextureNameMap[baseName];
+                            }
+                        }
+
+                        if(materials[iMaterialID].emissive_texname.length() > 0)
+                        {
+                            std::string baseName = parseBaseName(materials[iMaterialID].emissive_texname);
+                            if(aEmissiveTextureNameMap.find(baseName) == aEmissiveTextureNameMap.end())
+                            {
+                                aEmissiveTextureNameMap[baseName] = (uint32_t)aEmissiveTextureNames.size();
+                                material.miEmissiveTextureID = (uint32_t)aEmissiveTextureNames.size();
+                                aEmissiveTextureNames.push_back(baseName);
+                            }
+                            else
+                            {
+                                material.miEmissiveTextureID = aEmissiveTextureNameMap[baseName];
+                            }
+                        }
+
+                        if(materials[iMaterialID].specular_texname.length() > 0)
+                        {
+                            std::string baseName = parseBaseName(materials[iMaterialID].emissive_texname);
+                            if(aSpecularTextureNameMap.find(baseName) == aSpecularTextureNameMap.end())
+                            {
+                                aSpecularTextureNameMap[baseName] = (uint32_t)aSpecularTextureNames.size();
+                                material.miSpecularTextureID = (uint32_t)aSpecularTextureNames.size();
+                                aSpecularTextureNames.push_back(baseName);
+                            }
+                            else
+                            {
+                                material.miSpecularTextureID = aSpecularTextureNameMap[baseName];
+                            }
+                        }
+
+                        if(materials[iMaterialID].normal_texname.length() > 0)
+                        {
+                            std::string baseName = parseBaseName(materials[iMaterialID].emissive_texname);
+                            if(aNormalTextureNameMap.find(baseName) == aNormalTextureNameMap.end())
+                            {
+                                aNormalTextureNameMap[baseName] = (uint32_t)aNormalTextureNames.size();
+                                material.miNormalTextureID = (uint32_t)aNormalTextureNames.size();
+                                aNormalTextureNames.push_back(baseName);
+                            }
+                            else
+                            {
+                                material.miNormalTextureID = aNormalTextureNameMap[baseName];
+                            }
+                        }
+
+                    }   // material texture names
+
+                    aMeshMaterials.push_back(material);
+                    aiMeshMaterialIDs.push_back((uint32_t)aMeshMaterials.size() - 1);
+
+                    iCurrMaterial = iMaterial;
+                }
 
                 // Loop over vertices in the face.
                 for(size_t v = 0; v < fv; v++)

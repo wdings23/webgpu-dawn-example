@@ -386,6 +386,7 @@ void initGraphics()
     //desc.mMeshFilePath = "Vinci_SurfacePro11";
     //desc.mMeshFilePath = "bistro-total";
     desc.mMeshFilePath = "little-tokyo";
+    //desc.mMeshFilePath = "ICE1";
     desc.mRenderJobPipelineFilePath = "render-jobs.json";
     desc.mpSampler = &gSampler;
     gRenderer.setup(desc);
@@ -670,10 +671,10 @@ void start()
             {
                 if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
                 {
-                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.5f;
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.25f;
                 }
 
-                gDeferredIndirectUniformData.mfCrossSectionPlaneD -= 0.1f;
+                gDeferredIndirectUniformData.mfCrossSectionPlaneD -= ((gfMeshRadius * 2.0f) / 100.0f);
 
                 Render::CRenderer::QueueData data;
                 data.mJobName = "Deferred Indirect Graphics";
@@ -690,10 +691,10 @@ void start()
             {
                 if(gDeferredIndirectUniformData.mfCrossSectionPlaneD > 1000.0f)
                 {
-                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.5f;
+                    gDeferredIndirectUniformData.mfCrossSectionPlaneD = gfMeshRadius * 1.25f;
                 }
 
-                gDeferredIndirectUniformData.mfCrossSectionPlaneD += 0.1f;
+                gDeferredIndirectUniformData.mfCrossSectionPlaneD += ((gfMeshRadius * 2.0f) / 100.0f);
 
                 Render::CRenderer::QueueData data;
                 data.mJobName = "Deferred Indirect Graphics";
@@ -1474,7 +1475,7 @@ void handleCameraMousePan(
     int32_t iLastX,
     int32_t iLastY)
 {
-    float const fSpeed = 0.01f;
+    float const fSpeed = gfMeshRadius * 0.001f;
 
     float fDiffX = float(iX - iLastX);
     float fDiffY = float(iY - iLastY);
@@ -1485,8 +1486,8 @@ void handleCameraMousePan(
     float3 tangent = cross(gCameraUp, normalizedViewDir);
     float3 binormal = cross(tangent, normalizedViewDir);
 
-    gCameraPosition = gCameraPosition + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
-    gCameraLookAt = gCameraLookAt + binormal * -fDiffY * fSpeed + tangent * -fDiffX * fSpeed;
+    gCameraPosition = gCameraPosition + binormal * fDiffY * fSpeed + tangent * fDiffX * fSpeed;
+    gCameraLookAt = gCameraLookAt + binormal * fDiffY * fSpeed + tangent * fDiffX * fSpeed;
 }
 
 
