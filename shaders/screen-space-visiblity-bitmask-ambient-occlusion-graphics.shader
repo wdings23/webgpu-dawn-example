@@ -156,6 +156,8 @@ fn ao(in: VertexOutput) -> FragmentOutput
 {
     var out: FragmentOutput;
 
+    let fDirection: f32 = 1.0f;
+
     let kiNumSections: u32 = 16u;
     let kiNumSlices: u32 = 16u;
     var kfThickness: f32 = 0.01f;
@@ -208,7 +210,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
         1.0f / f32(textureSize.x), 
         1.0f / f32(textureSize.y)) * fSampleRadius;
 
-    let viewPosition: vec3f = cameraPosition - worldPosition.xyz;
+    let viewPosition: vec3f = (cameraPosition - worldPosition.xyz) * fDirection;
     var viewDirection: vec3f = normalize(viewPosition * -1.0f);
 
     // sample multiple slices around the view direction
@@ -287,10 +289,10 @@ fn ao(in: VertexOutput) -> FragmentOutput
                     0
                 );
 
-                let sampleViewPosition: vec3f = cameraPosition - sampleWorldPosition.xyz;
+                let sampleViewPosition: vec3f = (cameraPosition - sampleWorldPosition.xyz) * fDirection;
 
                 // sample view position - current view position
-                let deltaViewSpacePosition: vec3f = viewPosition.xyz - sampleViewPosition.xyz;
+                let deltaViewSpacePosition: vec3f = (viewPosition.xyz - sampleViewPosition.xyz) * fDirection;
                 let fDeltaViewSpaceLength: f32 = dot(deltaViewSpacePosition, deltaViewSpacePosition);
                 
                 // front and back horizon angle
@@ -349,7 +351,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     let fMax: f32 = 0.7f;
     fAO = (clamp(fAO, fMin, fMax) - fMin) / (fMax - fMin);
     
-    let kfReflectivity: f32 = 0.75f;
+    let kfReflectivity: f32 = 0.7f;
 
     //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO)));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);

@@ -188,7 +188,7 @@ fn pbr(worldPosition: vec3f,
 
     // reflectance equation
     var Lo: vec3f = vec3f(0.0f, 0.0f, 0.0f);
-    for(var i: i32 = 0; i < 3; i += 1) 
+    for(var i: i32 = 0; i < 4; i += 1) 
     {
         // calculate per-light radiance
         let L: vec3f = normalize(lightPositions[i] - worldPosition);
