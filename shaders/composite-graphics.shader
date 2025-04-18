@@ -48,6 +48,9 @@ var selectionTexture: texture_2d<f32>;
 @group(0) @binding(3)
 var crossSectionTexture: texture_2d<f32>;
 
+@group(0) @binding(4)
+var indirectLightingTexture: texture_2d<f32>;
+
 @group(1) @binding(0)
 var<uniform> defaultUniformBuffer: DefaultUniformData;
 
@@ -83,6 +86,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     ) *
     textureSample(
         selectionTexture,
+        textureSampler,
+        in.uv
+    ) + 
+    textureSample(
+        indirectLightingTexture,
         textureSampler,
         in.uv
     );

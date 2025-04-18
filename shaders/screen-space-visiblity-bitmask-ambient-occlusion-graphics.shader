@@ -17,6 +17,7 @@ struct VertexOutput
 struct FragmentOutput 
 {
     @location(0) mAmbientOcclusion: vec4<f32>,
+    @location(1) mIndirectLighting: vec4<f32>,
 };
 
 struct UniformData
@@ -76,6 +77,9 @@ var normalTexture: texture_2d<f32>;
 
 @group(0) @binding(2)
 var textureCoordAndClipSpaceTexture: texture_2d<f32>;
+
+@group(0) @binding(3)
+var lightingTexture: texture_2d<f32>;
 
 @group(1) @binding(0)
 var<uniform> uniformData: UniformData;
@@ -210,6 +214,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     // sample multiple slices around the view direction
     var iTotalBits: u32 = 0u;
     var iCountedBits: u32 = 0u;
+    var totalIndirectLighting: vec3f = vec3f(0.0f, 0.0f, 0.0f);
     for(var iSlice: u32 = 0; iSlice < kiNumSlices; iSlice++)
     {
         // These steps are essentially for patitioning the middle of the slide to integrate over
@@ -245,6 +250,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
         var iAOBitMask: u32 = 0u;
         var fSampleDirection: f32 = 1.0f;
         var iOccludedBits: u32 = 0u;
+        var sectionLighting: vec3f = vec3f(0.0f, 0.0f, 0.0f);
         for(var iDirection: u32 = 0u; iDirection < 2u; iDirection++)
         {
             fSampleDirection = 1.0f;
@@ -252,6 +258,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
             {
                 fSampleDirection = -1.0f;
             }
+
             for(var iSection: u32 = 0u; iSection < kiNumSections; iSection++)
             {
                 // sample view clip space position and normal
@@ -269,6 +276,16 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 {
                     continue;
                 }
+                var sampleNormal: vec4f = textureLoad(
+                    normalTexture,
+                    sampleScreenCoord,
+                    0
+                );
+                var sampleLighting: vec4f = textureLoad(
+                    lightingTexture,
+                    sampleScreenCoord,
+                    0
+                );
 
                 let sampleViewPosition: vec3f = cameraPosition - sampleWorldPosition.xyz;
 
@@ -306,6 +323,10 @@ fn ao(in: VertexOutput) -> FragmentOutput
                 if(iAngleHorizon > 0u)
                 {
                     iOccludedBits |= (1u << iStartHorizon);
+
+                    sectionLighting += sampleLighting.xyz * 
+                        max(dot(normal.xyz, normalize(deltaViewSpacePosition.xyz)), 0.0f) * 
+                        max(dot(sampleNormal.xyz, normalize(deltaViewSpacePosition.xyz * -1.0f)), 0.0f);
                 }
             
             }   // for slice
@@ -313,19 +334,26 @@ fn ao(in: VertexOutput) -> FragmentOutput
             let iNumBits: u32 = CountBits(iOccludedBits);
             iCountedBits += iNumBits;
 
+            sectionLighting /= (f32(iNumBits) + 0.001f);
+
         }   // for direction
 
         iTotalBits += kiNumSections;
 
+        totalIndirectLighting += sectionLighting;
+
     }   // for slice
 
-    var fAO: f32 = 1.0f - f32(iCountedBits) / f32(iTotalBits);
+    var fAO: f32 = 1.0f - f32(iCountedBits) / (f32(iTotalBits) + 0.001f);
     let fMin: f32 = 0.0f;
     let fMax: f32 = 0.7f;
     fAO = (clamp(fAO, fMin, fMax) - fMin) / (fMax - fMin);
     
+    let kfReflectivity: f32 = 0.75f;
+
     //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO)));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);
+    out.mIndirectLighting = vec4f((totalIndirectLighting.xyz / f32(kiNumSlices)) * kfReflectivity, 1.0f);
 
     return out;
 }
