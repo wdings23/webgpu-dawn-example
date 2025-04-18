@@ -272,18 +272,18 @@ int main(int argc, char* argv[])
                 int32_t iMaterialID = shapes[s].mesh.material_ids[0];
                 material.mDiffuse = float4(
                     (float)materials[iMaterialID].diffuse[0], 
-                    (float)materials[iMaterialID].diffuse[0], 
-                    (float)materials[iMaterialID].diffuse[0], 1.0f);
+                    (float)materials[iMaterialID].diffuse[1], 
+                    (float)materials[iMaterialID].diffuse[2], 1.0f);
 
                 material.mSpecular = float4(
                     (float)materials[iMaterialID].specular[0],
-                    (float)materials[iMaterialID].specular[0],
-                    (float)materials[iMaterialID].specular[0], 1.0f);
+                    (float)materials[iMaterialID].specular[1],
+                    (float)materials[iMaterialID].specular[2], 1.0f);
 
                 material.mEmissive = float4(
                     (float)materials[iMaterialID].emission[0],
-                    (float)materials[iMaterialID].emission[0],
-                    (float)materials[iMaterialID].emission[0], 1.0f);
+                    (float)materials[iMaterialID].emission[1],
+                    (float)materials[iMaterialID].emission[2], 1.0f);
 
                 material.mAlbedoTexturePath = materials[iMaterialID].diffuse_texname;
                 material.mEmissiveTexturePath = materials[iMaterialID].emissive_texname;
@@ -409,18 +409,18 @@ int main(int argc, char* argv[])
                     int32_t iMaterialID = shapes[s].mesh.material_ids[f];
                     material.mDiffuse = float4(
                         (float)materials[iMaterialID].diffuse[0],
-                        (float)materials[iMaterialID].diffuse[0],
-                        (float)materials[iMaterialID].diffuse[0], 1.0f);
+                        (float)materials[iMaterialID].diffuse[1],
+                        (float)materials[iMaterialID].diffuse[2], 1.0f);
 
                     material.mSpecular = float4(
                         (float)materials[iMaterialID].specular[0],
-                        (float)materials[iMaterialID].specular[0],
-                        (float)materials[iMaterialID].specular[0], 1.0f);
+                        (float)materials[iMaterialID].specular[1],
+                        (float)materials[iMaterialID].specular[2], 1.0f);
 
                     material.mEmissive = float4(
                         (float)materials[iMaterialID].emission[0],
-                        (float)materials[iMaterialID].emission[0],
-                        (float)materials[iMaterialID].emission[0], 1.0f);
+                        (float)materials[iMaterialID].emission[1],
+                        (float)materials[iMaterialID].emission[2], 1.0f);
 
                     material.mAlbedoTexturePath = materials[iMaterialID].diffuse_texname;
                     material.mEmissiveTexturePath = materials[iMaterialID].emissive_texname;
