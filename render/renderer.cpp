@@ -65,6 +65,8 @@ struct DefaultUniformData
     float mfAmbientOcclusionDistanceThreshold = 0.0f;
 };
 
+
+
 // Callback function to write data to file
 size_t writeData(void* ptr, size_t size, size_t nmemb, void* pData) 
 {
@@ -575,6 +577,148 @@ namespace Render
         bufferDesc.size = 1024;
         mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
         mOutputImageBuffer.SetLabel("Read Back Image Buffer");
+
+        // font atlas
+        {
+#if defined(__EMSCRIPTEN__)
+            char* acAtlasImageData = nullptr;
+            uint32_t iFileSize = Loader::loadFile(&acAtlasImageData, "font-atlas.png");
+#else 
+            std::vector<char> acAtlasImageDataV;
+            Loader::loadFile(acAtlasImageDataV, "font-atlas.png");
+            char* acAtlasImageData = acAtlasImageDataV.data();
+            uint32_t iFileSize = (uint32_t)acAtlasImageDataV.size();
+#endif // __EMSCRIPTEN__
+
+            int32_t iImageWidth = 0, iImageHeight = 0, iNumComp = 0;
+            stbi_uc* pImageData = stbi_load_from_memory(
+                (stbi_uc const*)acAtlasImageData,
+                (int32_t)iFileSize,
+                &iImageWidth,
+                &iImageHeight,
+                &iNumComp,
+                4
+            );
+
+            wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+            wgpu::TextureDescriptor textureDesc = {};
+            textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+            textureDesc.dimension = wgpu::TextureDimension::e2D;
+            textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+            textureDesc.mipLevelCount = 1;
+            textureDesc.sampleCount = 1;
+            textureDesc.size.depthOrArrayLayers = 1;
+            textureDesc.size.width = iImageWidth;
+            textureDesc.size.height = iImageHeight;
+            textureDesc.viewFormatCount = 1;
+            textureDesc.viewFormats = aViewFormats;
+            maTextures["font-atlas-image"] = mpDevice->CreateTexture(&textureDesc);
+            maTextures["font-atlas-image"].SetLabel("Font Atlas");
+
+#if defined(__EMSCRIPTEN__)
+            wgpu::TextureDataLayout layout = {};
+#else
+            wgpu::TexelCopyBufferLayout layout = {};
+#endif // __EMSCRIPTEN__
+            layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
+            layout.offset = 0;
+            layout.rowsPerImage = iImageHeight;
+            wgpu::Extent3D extent = {};
+            extent.depthOrArrayLayers = 1;
+            extent.width = iImageWidth;
+            extent.height = iImageHeight;
+
+#if defined(__EMSCRIPTEN__)
+            wgpu::ImageCopyTexture destination = {};
+#else 
+            wgpu::TexelCopyTextureInfo destination = {};
+#endif // __EMSCRIPTEN__
+            destination.aspect = wgpu::TextureAspect::All;
+            destination.mipLevel = 0;
+            destination.origin = {.x = 0, .y = 0, .z = 0,};
+            destination.texture = maTextures["font-atlas-image"];
+            device.GetQueue().WriteTexture(
+                &destination,
+                pImageData,
+                iImageWidth * iImageHeight * 4,
+                &layout,
+                &extent);
+            stbi_image_free(pImageData);
+
+            wgpu::TextureViewDescriptor viewDesc = {};
+            viewDesc.arrayLayerCount = 1;
+            viewDesc.aspect = wgpu::TextureAspect::All;
+            viewDesc.baseArrayLayer = 0;
+            viewDesc.baseMipLevel = 0;
+            viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+            viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+            viewDesc.label = "Font Texture Atlas";
+            viewDesc.mipLevelCount = 1;
+#if !defined(__EMSCRIPTEN__)
+            viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+#endif // __EMSCRIPTEN__
+            maTextureViews["font-atlas-image"] = maTextures["font-atlas-image"].CreateView(&viewDesc);
+
+#if defined(__EMSCRIPTEN__)
+            free(acAtlasImageData);
+#endif // __EMSCRIPTEN__
+
+#if defined(__EMSCRIPTEN__)
+            char* acFontInfoData = nullptr;
+            iFileSize = Loader::loadFile(&acFontInfoData, "glyph_info.bin");
+#else 
+            std::vector<char> acFontInfoDataV;
+            Loader::loadFile(acFontInfoDataV, "glyph_info.bin");
+            char* acFontInfoData = acFontInfoDataV.data();
+            iFileSize = (uint32_t)acFontInfoDataV.size();
+#endif // __EMSCRIPTEN__
+
+            bufferDesc.size = iFileSize;
+            bufferDesc.usage = (wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage);
+            maBuffers["font-info"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["font-info"].SetLabel("Font Info Buffer");
+            mpDevice->GetQueue().WriteBuffer(maBuffers["font-info"], 0, acFontInfoData, iFileSize);
+
+            uint32_t iNumFontInfo = iFileSize / sizeof(OutputGlyphInfo);
+            maFontInfo.resize(iNumFontInfo);
+            memcpy(maFontInfo.data(), acFontInfoData, iFileSize);
+
+#if defined(__EMSCRIPTEN__)
+            free(acFontInfoData);
+#endif // __EMSCRIPTEN__
+
+            bufferDesc.size = sizeof(Vertex) * 4;
+            maBuffers["quad-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["quad-vertex-buffer"].SetLabel("Glyph Quad Vertex Buffer");
+            
+            Vertex aVertices[4];
+            aVertices[0].mPosition = float4(-1.0f, 1.0f, 0.0f, 1.0f);
+            aVertices[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
+            aVertices[2].mPosition = float4(1.0f, -1.0f, 0.0f, 1.0f);
+            aVertices[3].mPosition = float4(1.0f, 1.0f, 0.0f, 1.0f);
+            aVertices[0].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+            aVertices[1].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+            aVertices[2].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+            aVertices[3].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+            aVertices[0].mUV = float4(0.0f, 0.0f, 0.0f, 1.0f);
+            aVertices[1].mUV = float4(0.0f, 1.0f, 0.0f, 1.0f);
+            aVertices[2].mUV = float4(1.0f, 1.0f, 0.0f, 1.0f);
+            aVertices[3].mUV = float4(1.0f, 0.0f, 0.0f, 1.0f);
+            mpDevice->GetQueue().WriteBuffer(maBuffers["quad-vertex-buffer"], 0, aVertices, sizeof(aVertices));
+
+            bufferDesc.size = sizeof(uint32_t) * 6;
+            maBuffers["quad-index-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["quad-index-buffer"].SetLabel("Glyph Quad Index Buffer");
+
+            uint32_t aiIndices[6] = {0, 1, 2, 3, 1, 2};
+            mpDevice->GetQueue().WriteBuffer(maBuffers["quad-index-buffer"], 0, aiIndices, sizeof(aiIndices));
+
+            bufferDesc.size = 1024;
+            maBuffers["glyph-coordinates"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["glyph-coordinates"].SetLabel("Glyph Coordinates");
+
+            setupFontPipeline();
+        }
 
         mpInstance = desc.mpInstance;
     }
@@ -1191,6 +1335,302 @@ namespace Render
     CRenderer::SelectMeshInfo const& CRenderer::getSelectionInfo()
     {
         return mSelectMeshInfo;
+    }
+
+    /*
+    **
+    */
+    void CRenderer::setupFontPipeline()
+    {
+        // output texture for draw text
+        wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+        wgpu::TextureDescriptor textureDesc = {};
+        textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+        textureDesc.dimension = wgpu::TextureDimension::e2D;
+        textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        textureDesc.mipLevelCount = 1;
+        textureDesc.sampleCount = 1;
+        textureDesc.size.depthOrArrayLayers = 1;
+        textureDesc.size.width = mCreateDesc.miScreenWidth;
+        textureDesc.size.height = mCreateDesc.miScreenHeight;
+        textureDesc.viewFormatCount = 1;
+        textureDesc.viewFormats = aViewFormats;
+        mFontOutputAttachment = mpDevice->CreateTexture(&textureDesc);
+
+        // binding layouts
+        std::vector<wgpu::BindGroupLayoutEntry> aBindingLayouts;
+        wgpu::BindGroupLayoutEntry textureLayout = {};
+
+        // texture binding layout
+        // font atlas texture
+        textureLayout.binding = (uint32_t)aBindingLayouts.size();
+        textureLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+        textureLayout.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        textureLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        aBindingLayouts.push_back(textureLayout);
+
+        // glyph info
+        wgpu::BindGroupLayoutEntry bufferLayout = {};
+        bufferLayout.binding = (uint32_t)aBindingLayouts.size();
+        bufferLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+        bufferLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        bufferLayout.buffer.minBindingSize = 0;
+        aBindingLayouts.push_back(bufferLayout);
+
+        // draw coordinate info
+        bufferLayout.binding = (uint32_t)aBindingLayouts.size();
+        bufferLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+        bufferLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        bufferLayout.buffer.minBindingSize = 0;
+        aBindingLayouts.push_back(bufferLayout);
+
+        // default uniform buffer
+        bufferLayout.binding = (uint32_t)aBindingLayouts.size();
+        bufferLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+        bufferLayout.buffer.type = wgpu::BufferBindingType::Uniform;
+        bufferLayout.buffer.minBindingSize = 0;
+        aBindingLayouts.push_back(bufferLayout);
+
+        // sampler binding layout
+        wgpu::BindGroupLayoutEntry samplerLayout = {};
+        samplerLayout.binding = (uint32_t)aBindingLayouts.size();
+        samplerLayout.sampler.type = wgpu::SamplerBindingType::NonFiltering;
+        samplerLayout.visibility = wgpu::ShaderStage::Fragment;
+        aBindingLayouts.push_back(samplerLayout);
+
+        // create binding group layout
+        wgpu::BindGroupLayoutDescriptor bindGroupLayoutDesc = {};
+        bindGroupLayoutDesc.entries = aBindingLayouts.data();
+        bindGroupLayoutDesc.entryCount = (uint32_t)aBindingLayouts.size();
+        mFontBindGroupLayout = mpDevice->CreateBindGroupLayout(&bindGroupLayoutDesc);
+
+        // create bind group
+        std::vector<wgpu::BindGroupEntry> aBindGroupEntries;
+
+        // texture binding in group
+        // atlas texture
+        wgpu::BindGroupEntry bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.textureView = maTextureViews["font-atlas-image"];
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // font glyph info
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.buffer = maBuffers["font-info"];
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // draw coordinate info
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.buffer = maBuffers["glyph-coordinates"];
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // default uniform 
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.buffer = maBuffers["default-uniform-buffer"];
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // sample binding in group
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.sampler = *mpSampler;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // create bind group
+        wgpu::BindGroupDescriptor bindGroupDesc = {};
+        bindGroupDesc.layout = mFontBindGroupLayout;
+        bindGroupDesc.entries = aBindGroupEntries.data();
+        bindGroupDesc.entryCount = (uint32_t)aBindGroupEntries.size();
+        mFontBindGroup = mpDevice->CreateBindGroup(&bindGroupDesc);
+
+        // layout for creating pipeline
+        wgpu::PipelineLayoutDescriptor layoutDesc = {};
+        layoutDesc.bindGroupLayoutCount = 1;
+        layoutDesc.bindGroupLayouts = &mFontBindGroupLayout;
+        wgpu::PipelineLayout pipelineLayout = mpDevice->CreatePipelineLayout(&layoutDesc);
+
+        wgpu::ShaderModuleWGSLDescriptor wgslDesc = {};
+        std::string shaderPath = "shaders/draw_text.shader";
+#if defined(__EMSCRIPTEN__)
+        if(doc.HasMember("Emscripten Shader"))
+        {
+            shaderPath = std::string("shaders/") + doc["Emscripten Shader"].GetString();
+            printf("!!! USE EMSCRIPTEN SHADER !!!\n");
+        }
+
+        char* acShaderFileContent = nullptr;
+        Loader::loadFile(
+            &acShaderFileContent,
+            shaderPath,
+            true
+        );
+        wgslDesc.code = acShaderFileContent;
+
+        //printf("shader content: %s\n", acShaderFileContent);
+
+#else 
+        std::vector<char> acShaderFileContent;
+        Loader::loadFile(
+            acShaderFileContent,
+            shaderPath,
+            true
+        );
+        wgslDesc.code = acShaderFileContent.data();
+#endif // __EMSCRIPTEN__
+
+        wgpu::ShaderModuleDescriptor shaderModuleDescriptor
+        {
+            .nextInChain = &wgslDesc
+        };
+        wgpu::ShaderModule shaderModule = mpDevice->CreateShaderModule(&shaderModuleDescriptor);
+        wgpu::ColorTargetState colorTargetState
+        {
+            .format = wgpu::TextureFormat::RGBA8Unorm
+        };
+
+        wgpu::FragmentState fragmentState = {};
+        wgpu::VertexState vertexState = {};
+        wgpu::VertexBufferLayout vertexBufferLayout = {};
+        std::vector<wgpu::VertexAttribute> aVertexAttributes;
+        wgpu::VertexAttribute attrib = {};
+
+        fragmentState.module = shaderModule;
+        fragmentState.targetCount = 1;
+        fragmentState.targets = &colorTargetState;
+        fragmentState.entryPoint = "fs_main";
+
+        attrib.format = wgpu::VertexFormat::Float32x4;
+        attrib.offset = 0;
+        attrib.shaderLocation = 0;
+        aVertexAttributes.push_back(attrib);
+        attrib.offset = sizeof(float4);
+        attrib.shaderLocation = 1;
+        aVertexAttributes.push_back(attrib);
+        attrib.offset = sizeof(float4) * 2;
+        attrib.shaderLocation = 2;
+        aVertexAttributes.push_back(attrib);
+
+        // vertex layout
+        vertexBufferLayout.attributeCount = 3;
+        vertexBufferLayout.arrayStride = sizeof(float4) * 3;
+        vertexBufferLayout.attributes = aVertexAttributes.data();
+        vertexBufferLayout.stepMode = wgpu::VertexStepMode::Vertex;
+
+        // vertex shader
+        vertexState.module = shaderModule;
+        vertexState.entryPoint = "vs_main";
+        vertexState.buffers = &vertexBufferLayout;
+        vertexState.bufferCount = 1;
+        
+        // set the expected layout for pipeline and create
+        wgpu::RenderPipelineDescriptor renderPipelineDesc = {};
+        vertexState.module = shaderModule;
+        renderPipelineDesc.vertex = vertexState;
+        renderPipelineDesc.fragment = &fragmentState;
+        renderPipelineDesc.layout = pipelineLayout;
+        mDrawTextPipeline = mpDevice->CreateRenderPipeline(&renderPipelineDesc);
+
+#if defined(__EMSCRIPTEN__)
+        Loader::loadFileFree(acShaderFileContent);
+#endif // __EMSCRIPTEN__
+
+    }
+
+    /*
+    **
+    */
+    void CRenderer::drawText(
+        std::string const& text, 
+        uint32_t iX, 
+        uint32_t iY, 
+        uint32_t iSize)
+    {
+        struct Coord
+        {
+            int32_t        miX;
+            int32_t        miY;
+            int32_t        miGlyphIndex;
+        };
+
+        std::vector<Coord> aGlyphCoord;
+        uint32_t iTextLength = (uint32_t)text.length();
+        uint32_t iCurrX = iX, iCurrY = iY;
+        for(uint32_t i = 0; i < iTextLength; i++)
+        {
+            int32_t iGlyphIndex = int32_t(text.at(i)) - 32;
+
+            int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].mSDFResult.left_bearing;
+            int32_t iGlyphY = iCurrY + maFontInfo[iGlyphIndex].mSDFResult.yOffset;
+        
+            Coord coord = {iGlyphX, iGlyphY, iGlyphIndex};
+            aGlyphCoord.push_back(coord);
+
+            iCurrX += maFontInfo[iGlyphIndex].mSDFResult.width;
+        }
+
+        mpDevice->GetQueue().WriteBuffer(
+            maBuffers["glyph-coordinates"],
+            0,
+            aGlyphCoord.data(),
+            aGlyphCoord.size() * sizeof(Coord)
+        );
+
+        wgpu::CommandEncoderDescriptor commandEncoderDesc = {};
+        wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
+
+        wgpu::RenderPassColorAttachment attachment
+        {
+            .view = mFontOutputAttachment.CreateView(),
+            .loadOp = wgpu::LoadOp::Clear,
+            .storeOp = wgpu::StoreOp::Store
+        };
+        wgpu::RenderPassDescriptor renderPassDesc = {};
+        renderPassDesc.colorAttachmentCount = 1;
+        renderPassDesc.colorAttachments = &attachment;
+        renderPassDesc.depthStencilAttachment = nullptr;
+        wgpu::RenderPassEncoder renderPassEncoder = commandEncoder.BeginRenderPass(&renderPassDesc);
+
+        renderPassEncoder.PushDebugGroup("Draw Text");
+
+        // bind broup, pipeline, index buffer, vertex buffer, scissor rect, viewport, and draw
+        renderPassEncoder.SetBindGroup(
+            0,
+            mFontBindGroup);
+        
+
+        renderPassEncoder.SetPipeline(mDrawTextPipeline);
+        renderPassEncoder.SetIndexBuffer(
+            maBuffers["train-index-buffer"],
+            wgpu::IndexFormat::Uint32
+        );
+        renderPassEncoder.SetVertexBuffer(
+            0,
+            maBuffers["train-vertex-buffer"]
+        );
+        renderPassEncoder.SetScissorRect(
+            0,
+            0,
+            mCreateDesc.miScreenWidth,
+            mCreateDesc.miScreenHeight);
+        renderPassEncoder.SetViewport(
+            0,
+            0,
+            (float)mCreateDesc.miScreenWidth,
+            (float)mCreateDesc.miScreenHeight,
+            0.0f,
+            1.0f);
+        
+        renderPassEncoder.Draw(6);
+         
+        renderPassEncoder.PopDebugGroup();
+        renderPassEncoder.End();
+
     }
 
 }   // Render

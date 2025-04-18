@@ -177,6 +177,45 @@ namespace Render
         wgpu::Texture                           mDiffuseTextureAtlas;
         wgpu::TextureView                       mDiffuseTextureAtlasView;
 
+        std::map<std::string, wgpu::Texture>              maTextures;
+        std::map<std::string, wgpu::TextureView>          maTextureViews;
+
+    protected:
+        struct MSDFInfo
+        {
+            int glyphIdx;
+            int left_bearing;
+            int advance;
+            float* rgb;
+            int width;
+            int height;
+            int yOffset;
+        };
+
+        struct OutputGlyphInfo
+        {
+            MSDFInfo                mSDFResult;
+            uint32_t                miAtlasX;
+            uint32_t                miAtlasY;
+            uint32_t                miASCII;
+        };
+
+        std::vector<OutputGlyphInfo>    maFontInfo;
+
+        wgpu::BindGroupLayout   mFontBindGroupLayout;
+        wgpu::BindGroup         mFontBindGroup;
+        wgpu::Sampler           mFontSampler;
+        wgpu::RenderPipeline    mDrawTextPipeline;
+
+        wgpu::Texture           mFontOutputAttachment;
+
+        void setupFontPipeline();
+        void drawText(
+            std::string const& text,
+            uint32_t iX,
+            uint32_t iY,
+            uint32_t iSize);
+
     };
 
 }   // Render
