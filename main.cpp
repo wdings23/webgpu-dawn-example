@@ -399,7 +399,7 @@ void initGraphics()
     if(gfMeshRadius <= 10.0f)
     {
         gInitialCameraLookAt = gMeshMidPt;
-        gInitialCameraPosition = gMeshMidPt + float3(0.0f, 0.0f, 1.0f) * gfMeshRadius * 1.25f;
+        gInitialCameraPosition = gMeshMidPt + float3(1.0f, -1.0f, 1.0f) * gfMeshRadius * 1.25f;
 
         gCameraLookAt = gInitialCameraLookAt;
         gCameraPosition = gInitialCameraPosition;
@@ -1598,7 +1598,7 @@ void zoomToSelection()
             float fRadiusMult = 1.25f;
 
             //gCameraPosition = midPt + normalize(diff) * fRadius;
-            gCameraPosition = midPt + float3(0.0f, 0.0f, 1.0f) * (fRadius * fRadiusMult);
+            gCameraPosition = midPt + float3(0.0f, 1.0f, -1.0f) * (fRadius * fRadiusMult);
             gCameraLookAt = midPt;
 
             gInitialCameraPosition = gCameraPosition;
