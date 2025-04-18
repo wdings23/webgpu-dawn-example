@@ -89,7 +89,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
         0
     );
 
-    var iMesh: i32 = i32(ceil(worldPosition.w - 0.5f));
+    var iMesh: i32 = i32(ceil((worldPosition.w - fract(worldPosition.w)) - 0.5f));
     if(worldPosition.w == 0.0f)
     {
         out.mOutput = vec4f(1.0f, 1.0f, 1.0f, 0.0f);
@@ -140,6 +140,18 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
             let normalDiff: vec3f = abs(sampleNormal - normal.xyz);
             let fNormalLengthSquared: f32 = dot(normalDiff, normalDiff);
             if(fNormalLengthSquared >= uniformBuffer.mfNormalThreshold)
+            {
+                bIsLine = true;
+                break;
+            }
+
+            let sampleWorldPosition: vec4f = textureLoad(
+                worldPositionTexture,
+                sampleScreenCoord,
+                0
+            );
+            let iSampleMesh: i32 = i32(ceil((sampleWorldPosition.w - fract(sampleWorldPosition.w) - 0.5f)));
+            if(iSampleMesh != iMesh && uniformBuffer.mfNormalThreshold < 1.0f)
             {
                 bIsLine = true;
                 break;
