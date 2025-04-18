@@ -1,23 +1,16 @@
 {
     "Type": "Graphics",
     "PassType": "Full Triangle",
-    "Shader": "screen-space-visiblity-bitmask-ambient-occlusion-graphics.shader",
+    "Shader": "outline-graphics.shader",
     "Attachments": [
         {
-            "Name": "Ambient Occlusion Output",
+            "Name": "Line Output",
             "Type": "TextureOutput",
             "Format": "rgba32float",
             "ScaleWidth": 1.0,
             "ScaleHeight": 1.0
         },
-        {
-            "Name": "Indirect Lighting Output",
-            "Type": "TextureOutput",
-            "Format": "rgba32float",
-            "ScaleWidth": 1.0,
-            "ScaleHeight": 1.0
-        },
-
+        
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
@@ -29,31 +22,19 @@
             "ParentJob": "Deferred Indirect Graphics"
         },
         {
-            "Name" : "Texture Coordinate And Clip Space Output",
+            "Name" : "Depth Output",
             "Type": "TextureInput",
             "ParentJob": "Deferred Indirect Graphics"
-        },
-        {
-            "Name": "PBR Output",
-            "Type": "TextureInput",
-            "ParentJob": "PBR Graphics"
         }
     ],
     "ShaderResources": [
         { 
-            "name" : "uniformData",
+            "name" : "uniformBuffer",
             "type" : "buffer",
-            "size" : 2048,
+            "size" : 64,
             "shader_stage" : "all",
             "usage": "uniform"
-        },
-        { 
-            "name" : "blueNoiseBuffer",
-            "type" : "buffer",
-            "shader_stage" : "all",
-            "usage": "read_only_storage",
-            "external": "true"
-        }    
+        }
     ],
     "BlendStates": [
         {

@@ -98,7 +98,12 @@ struct DeferredIndirectUniformData
 };
 DeferredIndirectUniformData gDeferredIndirectUniformData;
 
-
+struct OutlineUniformData
+{
+    float mfDepthThreshold;
+    float mfNormalThreshold;
+};
+OutlineUniformData gOutlineUniformData;
 
 void handleCameraMouseRotate(
     int32_t iX,
@@ -643,7 +648,7 @@ void start()
                 break;
             }
 
-            case GLFW_KEY_K:
+            case GLFW_KEY_SEMICOLON:
             {
                 gAOUniformData.mfThickness = std::max(gAOUniformData.mfThickness - 0.0001f, 0.0f);
 
@@ -658,7 +663,7 @@ void start()
                 break;
             }
 
-            case GLFW_KEY_L:
+            case GLFW_KEY_APOSTROPHE:
             {
                 gAOUniformData.mfThickness = std::max(gAOUniformData.mfThickness + 0.0001f, 0.0f);
 
@@ -668,6 +673,30 @@ void start()
                 data.miStart = 0;
                 data.miSize = (uint32_t)sizeof(AOUniformData);
                 data.mpData = &gAOUniformData;
+
+                gRenderer.addQueueData(data);
+                break;
+            }
+
+            case GLFW_KEY_L:
+            {
+                if(gOutlineUniformData.mfDepthThreshold < 1000.0f)
+                {
+                    gOutlineUniformData.mfDepthThreshold = 10000.0f;
+                    gOutlineUniformData.mfNormalThreshold = 10000.0f;
+                }
+                else
+                {
+                    gOutlineUniformData.mfDepthThreshold = 0.2f;
+                    gOutlineUniformData.mfNormalThreshold = 0.2f;
+                }
+
+                Render::CRenderer::QueueData data;
+                data.mJobName = "Outline Graphics";
+                data.mShaderResourceName = "uniformBuffer";
+                data.miStart = 0;
+                data.miSize = (uint32_t)sizeof(OutlineUniformData);
+                data.mpData = &gOutlineUniformData;
 
                 gRenderer.addQueueData(data);
                 break;
@@ -875,6 +904,15 @@ void start()
         gRenderer.addQueueData(data);
 
         data.mJobName = "Deferred Indirect Front Face Graphics";
+        gRenderer.addQueueData(data);
+
+        gOutlineUniformData.mfDepthThreshold = 0.2f;
+        gOutlineUniformData.mfNormalThreshold = 0.2f;
+
+        data.mJobName = "Outline Graphics";
+        data.mShaderResourceName = "uniformBuffer";
+        data.miSize = (uint32_t)sizeof(OutlineUniformData);
+        data.mpData = &gOutlineUniformData;
         gRenderer.addQueueData(data);
 
     }

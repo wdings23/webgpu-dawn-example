@@ -351,7 +351,7 @@ fn ao(in: VertexOutput) -> FragmentOutput
     let fMax: f32 = 0.7f;
     fAO = (clamp(fAO, fMin, fMax) - fMin) / (fMax - fMin);
     
-    let kfReflectivity: f32 = 0.7f;
+    let kfReflectivity: f32 = 0.9f;
 
     //fAO = smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, smoothstep(0.0f, 1.0f, fAO)));
     out.mAmbientOcclusion = vec4f(fAO, fAO, fAO, 1.0f);

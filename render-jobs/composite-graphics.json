@@ -28,10 +28,20 @@
             "Name" : "Clean Output",
             "Type": "TextureInput",
             "ParentJob": "Cross Section Cleanup Graphics"
+        },
+        {
+            "Name" : "Indirect Lighting Output",
+            "Type": "TextureInput",
+            "ParentJob": "Ambient Occlusion Graphics"
+        },
+        {
+            "Name" : "Line Output",
+            "Type": "TextureInput",
+            "ParentJob": "Outline Graphics"
         }
     ],
     "ShaderResources": [
-        
+       
     ],
     "BlendStates": [
         {

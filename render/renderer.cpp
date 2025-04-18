@@ -1106,6 +1106,7 @@ namespace Render
     */
     wgpu::Texture& CRenderer::getSwapChainTexture()
     {
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Outline Graphics"]->mOutputImageAttachments["Line Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Indirect Lighting Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Deferred Indirect Graphics"]->mOutputImageAttachments["Material Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["PBR Graphics"]->mOutputImageAttachments["PBR Output"];
@@ -1115,7 +1116,6 @@ namespace Render
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
-
 
         return swapChainTexture;
     }
