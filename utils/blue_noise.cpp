@@ -1,5 +1,3 @@
-#pragma once
-
 #include <utils/blue_noise.h>
 
 #include <random>
