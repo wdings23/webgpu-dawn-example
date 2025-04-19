@@ -696,6 +696,11 @@ namespace Render
             maBuffers["glyph-coordinates"] = mpDevice->CreateBuffer(&bufferDesc);
             maBuffers["glyph-coordinates"].SetLabel("Glyph Coordinates");
 
+            bufferDesc.size = 64;
+            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+            maBuffers["draw-text-uniform"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["draw-text-uniform"].SetLabel("Draw Text Uniform Buffer");
+
             setupFontPipeline();
         }
 
@@ -921,7 +926,9 @@ namespace Render
             oss.str(),
             100,
             20,
-            16);
+            50,
+            float3(1.0f, 0.5f, 0.2f)
+        );
 
         // add commands from the render jobs
         for(auto const& renderJobName : maOrderedRenderJobs)
@@ -1415,6 +1422,13 @@ namespace Render
         bufferLayout.buffer.minBindingSize = 0;
         aBindingLayouts.push_back(bufferLayout);
 
+        // uniform buffer
+        bufferLayout.binding = (uint32_t)aBindingLayouts.size();
+        bufferLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
+        bufferLayout.buffer.type = wgpu::BufferBindingType::Uniform;
+        bufferLayout.buffer.minBindingSize = 0;
+        aBindingLayouts.push_back(bufferLayout);
+
         // default uniform buffer
         bufferLayout.binding = (uint32_t)aBindingLayouts.size();
         bufferLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
@@ -1457,6 +1471,13 @@ namespace Render
         bindGroupEntry = {};
         bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
         bindGroupEntry.buffer = maBuffers["glyph-coordinates"];
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // uniform buffer
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.buffer = maBuffers["draw-text-uniform"];
         bindGroupEntry.sampler = nullptr;
         aBindGroupEntries.push_back(bindGroupEntry);
 
@@ -1584,7 +1605,8 @@ namespace Render
         std::string const& text, 
         uint32_t iX, 
         uint32_t iY, 
-        uint32_t iSize)
+        uint32_t iSize,
+        float3 const& color)
     {
         struct Coord
         {
@@ -1592,6 +1614,8 @@ namespace Render
             int32_t        miY;
             int32_t        miGlyphIndex;
         };
+
+        float fGlyphScale = float(iSize) / 64.0f;
 
         uint32_t iBorderSize = 0;
         std::vector<Coord> aGlyphCoord;
@@ -1606,13 +1630,16 @@ namespace Render
                 continue;
             }
             
-            int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].width / 2;
-            int32_t iGlyphY = iCurrY + /*maFontInfo[iGlyphIndex].yOffset + */maFontInfo[iGlyphIndex].height / 2;
+            int32_t iGlyphWidth = int32_t(maFontInfo[iGlyphIndex].width * fGlyphScale);
+            int32_t iGlyphHeight = int32_t(maFontInfo[iGlyphIndex].height * fGlyphScale);
+
+            int32_t iGlyphX = iCurrX + iGlyphWidth / 2;
+            int32_t iGlyphY = iCurrY + iGlyphHeight / 2;
         
             Coord coord = {iGlyphX, iGlyphY, iGlyphIndex};
             aGlyphCoord.push_back(coord);
 
-            iCurrX += maFontInfo[iGlyphIndex].width + iBorderSize;
+            iCurrX += iGlyphWidth + iBorderSize;
         }
 
         mpDevice->GetQueue().WriteBuffer(
@@ -1620,6 +1647,21 @@ namespace Render
             0,
             aGlyphCoord.data(),
             aGlyphCoord.size() * sizeof(Coord)
+        );
+
+        struct UniformData
+        {
+            float4      mScale;
+            float4      mColor;
+        };
+        UniformData uniformData;
+        uniformData.mScale = float4(fGlyphScale, fGlyphScale, fGlyphScale, fGlyphScale);
+        uniformData.mColor = float4(color.x, color.y, color.z, 1.0f);
+        mpDevice->GetQueue().WriteBuffer(
+            maBuffers["draw-text-uniform"],
+            0,
+            &uniformData,
+            sizeof(UniformData)
         );
 
         wgpu::CommandEncoderDescriptor commandEncoderDesc = {};

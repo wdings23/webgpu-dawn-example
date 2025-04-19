@@ -208,7 +208,8 @@ namespace Render
             std::string const& text,
             uint32_t iX,
             uint32_t iY,
-            uint32_t iSize);
+            uint32_t iSize,
+            float3 const& color);
 
         std::string     mFPSOutput;
         std::chrono::high_resolution_clock::time_point mLastTimeStart;
