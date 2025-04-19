@@ -173,7 +173,9 @@ namespace Loader
             gacTempMemory = (char*)malloc(iUncompressedSize);
             memcpy(gacTempMemory, buffer, iUncompressedSize);
             giTempMemorySize = (uint32_t)iUncompressedSize;
-            free(buffer);
+
+            mz_free(buffer);
+            mz_zip_reader_end(&zipArchive);
 
             printf("%s : %d \"%s\" uncompressed size: %d\n",
                 __FILE__,
