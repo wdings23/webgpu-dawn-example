@@ -1367,6 +1367,15 @@ namespace Render
         textureDesc.viewFormats = aViewFormats;
         mFontOutputAttachment = mpDevice->CreateTexture(&textureDesc);
 
+        wgpu::SamplerDescriptor samplerDesc = {};
+        samplerDesc.addressModeU = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.addressModeV = wgpu::AddressMode::ClampToEdge;
+        samplerDesc.minFilter = wgpu::FilterMode::Linear;
+        samplerDesc.magFilter = wgpu::FilterMode::Linear;
+        samplerDesc.mipmapFilter = wgpu::MipmapFilterMode::Linear;
+        mFontSampler = mpDevice->CreateSampler(&samplerDesc);
+        mFontSampler.SetLabel("Font Sampler");
+
         // binding layouts
         std::vector<wgpu::BindGroupLayoutEntry> aBindingLayouts;
         wgpu::BindGroupLayoutEntry textureLayout = {};
@@ -1375,7 +1384,7 @@ namespace Render
         // font atlas texture
         textureLayout.binding = (uint32_t)aBindingLayouts.size();
         textureLayout.visibility = (wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment);
-        textureLayout.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        textureLayout.texture.sampleType = wgpu::TextureSampleType::Float;
         textureLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
         aBindingLayouts.push_back(textureLayout);
 
@@ -1404,7 +1413,7 @@ namespace Render
         // sampler binding layout
         wgpu::BindGroupLayoutEntry samplerLayout = {};
         samplerLayout.binding = (uint32_t)aBindingLayouts.size();
-        samplerLayout.sampler.type = wgpu::SamplerBindingType::NonFiltering;
+        samplerLayout.sampler.type = wgpu::SamplerBindingType::Filtering;
         samplerLayout.visibility = wgpu::ShaderStage::Fragment;
         aBindingLayouts.push_back(samplerLayout);
 
@@ -1449,7 +1458,7 @@ namespace Render
         // sample binding in group
         bindGroupEntry = {};
         bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
-        bindGroupEntry.sampler = *mpSampler;
+        bindGroupEntry.sampler = mFontSampler;
         aBindGroupEntries.push_back(bindGroupEntry);
 
         // create bind group
@@ -1458,12 +1467,14 @@ namespace Render
         bindGroupDesc.entries = aBindGroupEntries.data();
         bindGroupDesc.entryCount = (uint32_t)aBindGroupEntries.size();
         mFontBindGroup = mpDevice->CreateBindGroup(&bindGroupDesc);
+        mFontBindGroup.SetLabel("Draw Text Bind Group");
 
         // layout for creating pipeline
         wgpu::PipelineLayoutDescriptor layoutDesc = {};
         layoutDesc.bindGroupLayoutCount = 1;
         layoutDesc.bindGroupLayouts = &mFontBindGroupLayout;
         wgpu::PipelineLayout pipelineLayout = mpDevice->CreatePipelineLayout(&layoutDesc);
+        pipelineLayout.SetLabel("Draw Text Pipeline Layout");
 
         wgpu::ShaderModuleWGSLDescriptor wgslDesc = {};
         std::string shaderPath = "shaders/draw_text.shader";
@@ -1545,6 +1556,7 @@ namespace Render
         renderPipelineDesc.fragment = &fragmentState;
         renderPipelineDesc.layout = pipelineLayout;
         mDrawTextPipeline = mpDevice->CreateRenderPipeline(&renderPipelineDesc);
+        mDrawTextPipeline.SetLabel("Draw Text Pipeline");
 
 #if defined(__EMSCRIPTEN__)
         Loader::loadFileFree(acShaderFileContent);
@@ -1569,7 +1581,7 @@ namespace Render
             int32_t        miGlyphIndex;
         };
 
-        uint32_t iBorderSize = 4;
+        uint32_t iBorderSize = 3;
         std::vector<Coord> aGlyphCoord;
         uint32_t iTextLength = (uint32_t)text.length();
         uint32_t iCurrX = iX, iCurrY = iY;
