@@ -1615,12 +1615,14 @@ namespace Render
         std::vector<Coord> aGlyphCoord;
         uint32_t iTextLength = (uint32_t)text.length();
         uint32_t iCurrX = iX, iCurrY = iY;
+        uint32_t iNumInvalidGlyph = 0;
         for(uint32_t i = 0; i < iTextLength; i++)
         {
             int32_t iGlyphIndex = int32_t(text.at(i)) - 33;
             if(iGlyphIndex < 0)
             {
                 iCurrX += 32;
+                iNumInvalidGlyph += 1;
                 continue;
             }
             
@@ -1701,7 +1703,7 @@ namespace Render
             0.0f,
             1.0f);
         
-        renderPassEncoder.DrawIndexed(6, iTextLength, 0, 0, 0);
+        renderPassEncoder.DrawIndexed(6, iTextLength - iNumInvalidGlyph, 0, 0, 0);
          
         renderPassEncoder.PopDebugGroup();
         renderPassEncoder.End();
