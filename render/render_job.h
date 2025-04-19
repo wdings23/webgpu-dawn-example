@@ -40,6 +40,7 @@ namespace Render
 			void* mpUserData = nullptr;
 
 			wgpu::TextureView*									mpTotalDiffuseTextureView = nullptr;
+			wgpu::Texture*										mpDrawTextOutputAttachment = nullptr;
 		};
 	public:
 		CRenderJob() = default;

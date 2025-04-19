@@ -554,30 +554,6 @@ namespace Render
             sizeof(TextureAtlasInfo)* (uint32_t)aTextureAtlasInfo.size()
         );
 
-        createRenderJobs(desc);
-
-        struct UniformData
-        {
-            uint32_t    miNumMeshes;
-            float       mfExplodeMultipler;
-        };
-
-        UniformData uniformData;
-        uniformData.miNumMeshes = (uint32_t)maMeshExtents.size();
-        uniformData.mfExplodeMultipler = 1.0f;
-        device.GetQueue().WriteBuffer(
-            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["uniformBuffer"],
-            0,
-            &uniformData,
-            sizeof(UniformData));
-        
-        bufferDesc = {};
-        bufferDesc.mappedAtCreation = false;
-        bufferDesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
-        bufferDesc.size = 1024;
-        mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
-        mOutputImageBuffer.SetLabel("Read Back Image Buffer");
-
         // font atlas
         {
 #if defined(__EMSCRIPTEN__)
@@ -635,7 +611,7 @@ namespace Render
 #endif // __EMSCRIPTEN__
             destination.aspect = wgpu::TextureAspect::All;
             destination.mipLevel = 0;
-            destination.origin = {.x = 0, .y = 0, .z = 0,};
+            destination.origin = {.x = 0, .y = 0, .z = 0, };
             destination.texture = maTextures["font-atlas-image"];
             device.GetQueue().WriteTexture(
                 &destination,
@@ -691,7 +667,7 @@ namespace Render
             bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
             maBuffers["quad-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
             maBuffers["quad-vertex-buffer"].SetLabel("Glyph Quad Vertex Buffer");
-            
+
             Vertex aVertices[4];
             aVertices[0].mPosition = float4(-1.0f, 1.0f, 0.0f, 1.0f);
             aVertices[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
@@ -722,6 +698,32 @@ namespace Render
 
             setupFontPipeline();
         }
+
+        createRenderJobs(desc);
+
+        struct UniformData
+        {
+            uint32_t    miNumMeshes;
+            float       mfExplodeMultipler;
+        };
+
+        UniformData uniformData;
+        uniformData.miNumMeshes = (uint32_t)maMeshExtents.size();
+        uniformData.mfExplodeMultipler = 1.0f;
+        device.GetQueue().WriteBuffer(
+            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["uniformBuffer"],
+            0,
+            &uniformData,
+            sizeof(UniformData));
+        
+        bufferDesc = {};
+        bufferDesc.mappedAtCreation = false;
+        bufferDesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
+        bufferDesc.size = 1024;
+        mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
+        mOutputImageBuffer.SetLabel("Read Back Image Buffer");
+
+        mLastTimeStart = std::chrono::high_resolution_clock::now();
 
         mpInstance = desc.mpInstance;
     }
@@ -905,8 +907,23 @@ namespace Render
 
         }
 
-        // add commands from the render jobs
+        uint64_t iElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - mLastTimeStart).count();
+        mLastTimeStart = std::chrono::high_resolution_clock::now();
+
+        uint32_t iFPS = uint32_t(float(1000.0f) / float(iElapsed));
+
+        std::ostringstream oss;
+        oss << iFPS << " fps";
+
         std::vector<wgpu::CommandBuffer> aCommandBuffer;
+        drawText(
+            aCommandBuffer,
+            oss.str(),
+            100,
+            20,
+            16);
+
+        // add commands from the render jobs
         for(auto const& renderJobName : maOrderedRenderJobs)
         {
             Render::CRenderJob* pRenderJob = maRenderJobs[renderJobName].get();
@@ -1069,13 +1086,6 @@ namespace Render
 
         }   // for all render jobs
 
-        drawText(
-            aCommandBuffer,
-            "60 FPS", 
-            800, 
-            20, 
-            16);
-
         // get selection info from shader via read back buffer
         if(mbWaitingForMeshSelection)
         {
@@ -1232,6 +1242,7 @@ namespace Render
             apRenderJobs.push_back(maRenderJobs[renderJobName].get());
         }
 
+        createInfo.mpDrawTextOutputAttachment = &mFontOutputAttachment;
         createInfo.mpDefaultUniformBuffer = &maBuffers["default-uniform-buffer"];
         createInfo.mpaRenderJobs = &apRenderJobs;
         uint32_t iIndex = 0;
@@ -1241,7 +1252,7 @@ namespace Render
             createInfo.mJobType = maRenderJobs[renderJobName]->mType;
             createInfo.mPassType = maRenderJobs[renderJobName]->mPassType;
             createInfo.mPipelineFilePath = aShaderModuleFilePath[iIndex];
-
+            
             if(maRenderJobs[renderJobName]->mType == Render::JobType::Copy)
             {
                 maRenderJobs[renderJobName]->setCopyAttachments(createInfo);
@@ -1266,8 +1277,9 @@ namespace Render
         //wgpu::Texture& swapChainTexture = maRenderJobs["PBR Graphics"]->mOutputImageAttachments["PBR Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Composite Graphics"]->mOutputImageAttachments["Composite Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
-        wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs["Final Composite Graphics"]->mOutputImageAttachments["Final Composite Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
 
@@ -1595,7 +1607,7 @@ namespace Render
             }
             
             int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].width / 2;
-            int32_t iGlyphY = iCurrY + maFontInfo[iGlyphIndex].yOffset + maFontInfo[iGlyphIndex].height / 2;
+            int32_t iGlyphY = iCurrY + /*maFontInfo[iGlyphIndex].yOffset + */maFontInfo[iGlyphIndex].height / 2;
         
             Coord coord = {iGlyphX, iGlyphY, iGlyphIndex};
             aGlyphCoord.push_back(coord);

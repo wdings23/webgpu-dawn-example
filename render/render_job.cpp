@@ -532,6 +532,11 @@ namespace Render
                 
                 }   // for render job in all render jobs
 
+                if(attachmentParentJobName == "Draw Text Graphics")
+                {
+                    mInputImageAttachments[attachmentName] = createInfo.mpDrawTextOutputAttachment;
+                }
+
             }   // if attachment type == Texture input
 
         }   // for attachment in attachments

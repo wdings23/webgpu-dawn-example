@@ -134,16 +134,7 @@ fn vs_main(
     );
 
     // position within the output image
-    //let glyphOutputScale: vec2f = vec2f(
-    //    f32(glyphInfo.width) * fOneOverWidth,
-    //    f32(glyphInfo.height) * fOneOverHeight
-    //);
-    //let pos: vec2f = aPos[i] * glyphScale;
-    //let glyphOutputPosition: vec2f = vec2f(
-    //    centerPos.x + pos.x * glyphOutputScale.x * 0.5f,
-    //    centerPos.y + pos.y * glyphOutputScale.y * 0.5f
-    //);
-    
+    // offset for the glyph corner positions
     const aPosMult = array(
         vec2i(-1, -1),
         vec2i(-1, 1),
@@ -152,10 +143,13 @@ fn vs_main(
     );
     let iX: i32 = drawCoordinateInfo.miX + (glyphInfo.width / 2) * aPosMult[i].x;
     let iY: i32 = drawCoordinateInfo.miY + (glyphInfo.height / 2) * aPosMult[i].y;
+    let iDiffY: i32 = i32(kGlyphSize) - iGlyphHeight;
     var glyphOutputPosition: vec2f = vec2f(
         f32(iX) / f32(defaultUniformBuffer.miScreenWidth),
-        f32(iY) / f32(defaultUniformBuffer.miScreenHeight)
+        f32(iY + iDiffY + glyphInfo.yOffset * -1) / f32(defaultUniformBuffer.miScreenHeight)
     );
+
+    // convert (0, 1) to (-1, 1), making sure to invert y 
     glyphOutputPosition.x = glyphOutputPosition.x * 2.0f - 1.0f;
     glyphOutputPosition.y = (glyphOutputPosition.y * 2.0f - 1.0f) * -1.0f;
 

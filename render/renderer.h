@@ -4,6 +4,7 @@
 #include <webgpu/webgpu_cpp.h>
 #include <string>
 #include <map>
+#include <chrono>
 
 #include <math/mat4.h>
 
@@ -209,6 +210,8 @@ namespace Render
             uint32_t iY,
             uint32_t iSize);
 
+        std::string     mFPSOutput;
+        std::chrono::high_resolution_clock::time_point mLastTimeStart;
     };
 
 }   // Render
