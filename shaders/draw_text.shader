@@ -42,6 +42,12 @@ struct Coord
     miGlyphIndex: i32,
 };
 
+struct UniformData
+{
+    mGlyphScale: vec4f,
+    mGlyphColor: vec4f,
+};
+
 @group(0) @binding(0)
 var fontAtlasTexture: texture_2d<f32>;
 
@@ -52,9 +58,12 @@ var<storage, read> aGlyphInfo: array<OutputGlyphInfo>;
 var<storage, read> aDrawTextCoordinate: array<Coord>;
 
 @group(0) @binding(3)
-var<uniform> defaultUniformBuffer: DefaultUniformData;
+var<uniform> uniformBuffer: UniformData;
 
 @group(0) @binding(4)
+var<uniform> defaultUniformBuffer: DefaultUniformData;
+
+@group(0) @binding(5)
 var textureSampler: sampler;
 
 struct VertexOutput 
@@ -122,16 +131,19 @@ fn vs_main(
     // uv of the glyph within the texture atlas
     let fStartU: f32 = f32(glyphInfo.miAtlasX) * fOneOverAtlasWidth;
     let fStartV: f32 = f32(glyphInfo.miAtlasY) * fOneOverAtlasHeight; 
-    let iGlyphWidth: i32 = glyphInfo.width;
-    let iGlyphHeight: i32 = glyphInfo.height;
     let glyphAtlasScale: vec2f = vec2f(
-        f32(iGlyphWidth) * fOneOverAtlasWidth,
-        f32(iGlyphHeight) * fOneOverAtlasHeight
+        f32(glyphInfo.width) * fOneOverAtlasWidth,
+        f32(glyphInfo.height) * fOneOverAtlasHeight
     );
     let glyphAtlasUV: vec2f = vec2f(
         fStartU + aUV[i].x * glyphAtlasScale.x,
         fStartV + aUV[i].y * glyphAtlasScale.y
     );
+
+    let fGlyphScale: f32 = uniformBuffer.mGlyphScale.x;
+    var iGlyphWidth: i32 = i32(f32(glyphInfo.width) * fGlyphScale);
+    var iGlyphHeight: i32 = i32(f32(glyphInfo.height) * fGlyphScale);
+    var iOffsetY: i32 = i32(-f32(glyphInfo.yOffset) * fGlyphScale);
 
     // position within the output image
     // offset for the glyph corner positions
@@ -141,12 +153,13 @@ fn vs_main(
         vec2i(1, 1),
         vec2i(1, -1)
     );
-    let iX: i32 = drawCoordinateInfo.miX + (glyphInfo.width / 2) * aPosMult[i].x;
-    let iY: i32 = drawCoordinateInfo.miY + (glyphInfo.height / 2) * aPosMult[i].y;
-    let iDiffY: i32 = i32(kGlyphSize) - iGlyphHeight;
+    let iX: i32 = drawCoordinateInfo.miX + (iGlyphWidth / 2) * aPosMult[i].x;
+    let iY: i32 = drawCoordinateInfo.miY + (iGlyphHeight / 2) * aPosMult[i].y;
+    var iDiffY: i32 = i32(kGlyphSize) - glyphInfo.height;
+    iDiffY = i32(f32(iDiffY) * fGlyphScale);
     var glyphOutputPosition: vec2f = vec2f(
         f32(iX) / f32(defaultUniformBuffer.miScreenWidth),
-        f32(iY + iDiffY + glyphInfo.yOffset * -1) / f32(defaultUniformBuffer.miScreenHeight)
+        f32(iY + iDiffY + iOffsetY) / f32(defaultUniformBuffer.miScreenHeight)
     );
 
     // convert (0, 1) to (-1, 1), making sure to invert y 
@@ -176,7 +189,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     let iGlyph: i32 = i32(ceil(in.mfGlyph - 0.5f));
     var glyphInfo: OutputGlyphInfo = aGlyphInfo[iGlyph];
 
-    let sz: vec2f = vec2f(f32(glyphInfo.width), f32(glyphInfo.height));
+    let fGlyphWidth: f32 = f32(glyphInfo.width) * uniformBuffer.mGlyphScale.x;
+    let fGlyphHeight: f32 = f32(glyphInfo.height) * uniformBuffer.mGlyphScale.x;
+
+    let sz: vec2f = vec2f(fGlyphWidth, fGlyphHeight);
     let dx: f32 = dpdx(in.uv.x) * sz.x; 
     let dy: f32 = dpdy(in.uv.y) * sz.y;
     let toPixels: f32 = 8.0f * inverseSqrt(dx * dx + dy * dy);
@@ -184,6 +200,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     let w: f32 = fwidth(sigDist);
     let fOpacity: f32 = smoothstep(0.5 - w, 0.5 + w, sigDist);
     
-    output.mOutput = vec4f(mix(vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f), fOpacity), fOpacity);
+    output.mOutput = vec4f(mix(vec3f(0.0f, 0.0f, 0.0f), uniformBuffer.mGlyphColor.xyz, fOpacity), fOpacity);
     return output;
 }
