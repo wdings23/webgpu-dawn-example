@@ -10,6 +10,8 @@
 
 #include <assert.h>
 
+#include <tinyexr/miniz.h>
+
 namespace Loader
 {
     // Callback function to write data to file
@@ -74,12 +76,31 @@ namespace Loader
     {
         printf("load %s\n", filePath.c_str());
         
+        auto fileExtensionStart = filePath.rfind(".") - 1;
+        auto directoryEnd = filePath.rfind("/");
+        std::string baseName = filePath.substr(directoryEnd + 1, fileExtensionStart - directoryEnd);
+
+        bool bZipFile = false;
         FILE* fp = fopen(filePath.c_str(), "rb");
         if(fp == nullptr)
         {
             std::string newPath = std::string("assets/") + filePath;
             fp = fopen(newPath.c_str(), "rb");
             printf("new path: %s\n", newPath.c_str());
+
+            if(fp == nullptr)
+            {
+                printf("%s : %d base name: %s\n", 
+                    __FILE__,
+                    __LINE__,
+                    baseName.c_str());
+
+                newPath = std::string("assets/") + baseName + ".zip";
+                fp = fopen(newPath.c_str(), "rb");
+                printf("new path: %s\n", newPath.c_str());
+
+                bZipFile = true;
+            }
         }
         assert(fp);
 
@@ -102,6 +123,64 @@ namespace Loader
         giTempMemorySize = iFileSize;
 
         fclose(fp);
+
+        if(bZipFile)
+        {
+            std::string fileName = baseName + ".bin";
+            printf("%s : %d zip file to extract: %s\n",
+                __FILE__,
+                __LINE__,
+                fileName.c_str());
+
+            mz_zip_archive zipArchive;
+            memset(&zipArchive, 0, sizeof(zipArchive));
+
+            mz_bool status = mz_zip_reader_init_mem(&zipArchive, gacTempMemory, giTempMemorySize, 0);
+            if(!status)
+            {
+                printf("%s : %d status = %d\n",
+                    __FILE__,
+                    __LINE__,
+                    status);
+                assert(0);
+            }
+
+            int32_t iFileIndex = mz_zip_reader_locate_file(&zipArchive, fileName.c_str(), nullptr, 0);
+            if(iFileIndex == -1)
+            {
+                printf("%s : %d can\'t find file \"%s\"\n",
+                    __FILE__,
+                    __LINE__,
+                    fileName.c_str());
+                assert(0);
+            }
+            printf("%s : %d file index = %d\n",
+                __FILE__,
+                __LINE__,
+                iFileIndex);
+
+            size_t iUncompressedSize;
+            void* buffer = mz_zip_reader_extract_file_to_heap(&zipArchive, fileName.c_str(), &iUncompressedSize, 0);
+            if(buffer == nullptr)
+            {
+                printf("%s : %d can\'t uncompress file \"%s\"\n",
+                    __FILE__,
+                    __LINE__,
+                    fileName.c_str());
+                assert(0);
+            }
+            free(gacTempMemory);
+            gacTempMemory = (char*)malloc(iUncompressedSize);
+            memcpy(gacTempMemory, buffer, iUncompressedSize);
+            giTempMemorySize = (uint32_t)iUncompressedSize;
+            free(buffer);
+
+            printf("%s : %d \"%s\" uncompressed size: %d\n",
+                __FILE__,
+                __LINE__,
+                fileName.c_str(),
+                (uint32_t)iUncompressedSize);
+        }
 
         *pacFileContentBuffer = gacTempMemory;
 

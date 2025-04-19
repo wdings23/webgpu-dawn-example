@@ -8,6 +8,7 @@ add_subdirectory(loader)
 add_subdirectory(math)
 add_subdirectory(render)
 add_subdirectory(utils)
+add_subdirectory(external/tinyexr)
 target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR})
 target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR}/external)
 
@@ -62,7 +63,8 @@ if(EMSCRIPTEN)
     "-sFETCH=1"
     #"-sUSE_PTHREADS=1"
     "-sASSERTIONS"
-    "-sSTACK_SIZE=1048576")
+    "-sSTACK_SIZE=1048576"
+    "-s USE_ZLIB=1")
 else()
   find_package(CURL REQUIRED)
 
