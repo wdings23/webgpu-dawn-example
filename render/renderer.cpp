@@ -1071,8 +1071,8 @@ namespace Render
 
         drawText(
             aCommandBuffer,
-            "WTF", 
-            900, 
+            "60 FPS", 
+            800, 
             20, 
             16);
 
@@ -1581,21 +1581,26 @@ namespace Render
             int32_t        miGlyphIndex;
         };
 
-        uint32_t iBorderSize = 3;
+        uint32_t iBorderSize = 0;
         std::vector<Coord> aGlyphCoord;
         uint32_t iTextLength = (uint32_t)text.length();
         uint32_t iCurrX = iX, iCurrY = iY;
         for(uint32_t i = 0; i < iTextLength; i++)
         {
             int32_t iGlyphIndex = int32_t(text.at(i)) - 33;
-
+            if(iGlyphIndex < 0)
+            {
+                iCurrX += 32;
+                continue;
+            }
+            
             int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].width / 2;
             int32_t iGlyphY = iCurrY + maFontInfo[iGlyphIndex].yOffset + maFontInfo[iGlyphIndex].height / 2;
         
             Coord coord = {iGlyphX, iGlyphY, iGlyphIndex};
             aGlyphCoord.push_back(coord);
 
-            iCurrX += (maFontInfo[iGlyphIndex].width / 2) + iBorderSize;
+            iCurrX += maFontInfo[iGlyphIndex].width + iBorderSize;
         }
 
         mpDevice->GetQueue().WriteBuffer(

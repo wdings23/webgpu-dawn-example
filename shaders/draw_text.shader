@@ -74,6 +74,8 @@ fn vs_main(
     @builtin(vertex_index) i : u32, 
     @builtin(instance_index) iInstanceIndex: u32) -> VertexOutput 
 {
+    let kGlyphSize: f32 = 64.0f;
+
     var drawCoordinateInfo: Coord = aDrawTextCoordinate[iInstanceIndex];
     var glyphInfo: OutputGlyphInfo = aGlyphInfo[drawCoordinateInfo.miGlyphIndex];
 
@@ -112,6 +114,11 @@ fn vs_main(
         vec2f(1.0f, 0.0f)
     );
 
+    let glyphScale: vec2f = vec2f(
+        f32(glyphInfo.width) / kGlyphSize,
+        f32(glyphInfo.height) / kGlyphSize
+    );
+
     // uv of the glyph within the texture atlas
     let fStartU: f32 = f32(glyphInfo.miAtlasX) * fOneOverAtlasWidth;
     let fStartV: f32 = f32(glyphInfo.miAtlasY) * fOneOverAtlasHeight; 
@@ -127,15 +134,31 @@ fn vs_main(
     );
 
     // position within the output image
-    let glyphOutputScale: vec2f = vec2f(
-        f32(iGlyphWidth) * fOneOverWidth,
-        f32(iGlyphHeight) * fOneOverHeight
-    );
-    let glyphOutputPosition: vec2f = vec2f(
-        centerPos.x + aPos[i].x * glyphOutputScale.x * 0.5f,
-        centerPos.y + aPos[i].y * glyphOutputScale.y * 0.5f
-    );
+    //let glyphOutputScale: vec2f = vec2f(
+    //    f32(glyphInfo.width) * fOneOverWidth,
+    //    f32(glyphInfo.height) * fOneOverHeight
+    //);
+    //let pos: vec2f = aPos[i] * glyphScale;
+    //let glyphOutputPosition: vec2f = vec2f(
+    //    centerPos.x + pos.x * glyphOutputScale.x * 0.5f,
+    //    centerPos.y + pos.y * glyphOutputScale.y * 0.5f
+    //);
     
+    const aPosMult = array(
+        vec2i(-1, -1),
+        vec2i(-1, 1),
+        vec2i(1, 1),
+        vec2i(1, -1)
+    );
+    let iX: i32 = drawCoordinateInfo.miX + (glyphInfo.width / 2) * aPosMult[i].x;
+    let iY: i32 = drawCoordinateInfo.miY + (glyphInfo.height / 2) * aPosMult[i].y;
+    var glyphOutputPosition: vec2f = vec2f(
+        f32(iX) / f32(defaultUniformBuffer.miScreenWidth),
+        f32(iY) / f32(defaultUniformBuffer.miScreenHeight)
+    );
+    glyphOutputPosition.x = glyphOutputPosition.x * 2.0f - 1.0f;
+    glyphOutputPosition.y = (glyphOutputPosition.y * 2.0f - 1.0f) * -1.0f;
+
     var output: VertexOutput;
     output.pos = vec4f(glyphOutputPosition, 0.0f, 1.0f);
     output.uv = vec2(glyphAtlasUV.x, glyphAtlasUV.y);        
@@ -162,7 +185,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
     let sz: vec2f = vec2f(f32(glyphInfo.width), f32(glyphInfo.height));
     let dx: f32 = dpdx(in.uv.x) * sz.x; 
     let dy: f32 = dpdy(in.uv.y) * sz.y;
-    let toPixels: f32 = 8.0 * inverseSqrt(dx * dx + dy * dy);
+    let toPixels: f32 = 8.0f * inverseSqrt(dx * dx + dy * dy);
     let sigDist: f32 = max(min(sample.r, sample.g), min(max(sample.r, sample.g), sample.b));
     let w: f32 = fwidth(sigDist);
     let fOpacity: f32 = smoothstep(0.5 - w, 0.5 + w, sigDist);
