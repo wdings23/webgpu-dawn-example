@@ -25,23 +25,14 @@ struct DefaultUniformData
     mLightDirection: vec4<f32>,
 };
 
-struct MSDFInfo
+struct OutputGlyphInfo
 {
-    glyphIdx: i32,
-    left_bearing: i32,
-    advance: i32,
-    rgb: array<f32, 3>,
     width: i32,
     height: i32,
     yOffset: i32,
-};
-
-struct OutputGlyphInfo
-{
-    mSDFResult: MSDFInfo,
-    miAtlasX: u32,
-    miAtlasY: u32,
-    miASCII: u32,
+    miAtlasX: i32,
+    miAtlasY: i32,
+    miASCII: i32,
 };
 
 struct Coord
@@ -70,6 +61,7 @@ struct VertexOutput
 {
     @builtin(position) pos: vec4f,
     @location(0) uv: vec2f,
+    @location(1) mfGlyph: f32,
 };
 
 struct FragmentOutput 
@@ -93,10 +85,17 @@ fn vs_main(
     let fOneOverAtlasWidth: f32 = 1.0f / f32(atlasSize.x);
     let fOneOverAtlasHeight: f32 = 1.0f / f32(atlasSize.y);
 
+    let iHalfWidth: i32 = defaultUniformBuffer.miScreenWidth / 2;
+    let iHalfHeight: i32 = defaultUniformBuffer.miScreenHeight / 2;
+
     // center position of the glyph on the screen in (0, 1)
+    //var centerPos: vec2f = vec2f(
+    //    f32(drawCoordinateInfo.miX) * fOneOverWidth,
+    //    f32(drawCoordinateInfo.miY) * fOneOverHeight
+    //);
     var centerPos: vec2f = vec2f(
-        f32(drawCoordinateInfo.miX + glyphInfo.mSDFResult.width / 2) * fOneOverWidth,
-        f32(drawCoordinateInfo.miY + glyphInfo.mSDFResult.height / 2) * fOneOverHeight
+        f32(drawCoordinateInfo.miX - iHalfWidth) / f32(iHalfWidth),
+        (f32(drawCoordinateInfo.miY - iHalfHeight) / f32(iHalfHeight)) * -1.0f
     );
 
     // default quad position and uv 
@@ -116,8 +115,8 @@ fn vs_main(
     // uv of the glyph within the texture atlas
     let fStartU: f32 = f32(glyphInfo.miAtlasX) * fOneOverAtlasWidth;
     let fStartV: f32 = f32(glyphInfo.miAtlasY) * fOneOverAtlasHeight; 
-    let iGlyphWidth: i32 = glyphInfo.mSDFResult.width;
-    let iGlyphHeight: i32 = glyphInfo.mSDFResult.height;
+    let iGlyphWidth: i32 = glyphInfo.width;
+    let iGlyphHeight: i32 = glyphInfo.height;
     let glyphAtlasScale: vec2f = vec2f(
         f32(iGlyphWidth) * fOneOverAtlasWidth,
         f32(iGlyphHeight) * fOneOverAtlasHeight
@@ -133,13 +132,15 @@ fn vs_main(
         f32(iGlyphHeight) * fOneOverHeight
     );
     let glyphOutputPosition: vec2f = vec2f(
-        centerPos.x + aPos[i].x * glyphOutputScale.x,
-        centerPos.y + aPos[i].y * glyphOutputScale.y
+        centerPos.x + aPos[i].x * glyphOutputScale.x * 0.5f,
+        centerPos.y + aPos[i].y * glyphOutputScale.y * 0.5f
     );
     
     var output: VertexOutput;
     output.pos = vec4f(glyphOutputPosition, 0.0f, 1.0f);
-    output.uv = glyphAtlasUV;        
+    output.uv = vec2(glyphAtlasUV.x, glyphAtlasUV.y);        
+
+    output.mfGlyph = f32(drawCoordinateInfo.miGlyphIndex);
 
     return output;
 }
@@ -149,13 +150,23 @@ fn fs_main(in: VertexOutput) -> FragmentOutput
 {
     var output: FragmentOutput;
 
-    var glyphImage: vec4f = textureSample(
+    var sample: vec3f = textureSample(
         fontAtlasTexture,
         textureSampler,
         in.uv.xy
-    );
+    ).xyz;
 
-    output.mOutput = glyphImage;
+    let iGlyph: i32 = i32(ceil(in.mfGlyph - 0.5f));
+    var glyphInfo: OutputGlyphInfo = aGlyphInfo[iGlyph];
 
+    let sz: vec2f = vec2f(f32(glyphInfo.width), f32(glyphInfo.height));
+    let dx: f32 = dpdx(in.uv.x) * sz.x; 
+    let dy: f32 = dpdy(in.uv.y) * sz.y;
+    let toPixels: f32 = 8.0 * inverseSqrt(dx * dx + dy * dy);
+    let sigDist: f32 = max(min(sample.r, sample.g), min(max(sample.r, sample.g), sample.b));
+    let w: f32 = fwidth(sigDist);
+    let fOpacity: f32 = smoothstep(0.5 - w, 0.5 + w, sigDist);
+    
+    output.mOutput = vec4f(mix(vec3f(0.0f, 0.0f, 0.0f), vec3f(1.0f, 1.0f, 1.0f), fOpacity), fOpacity);
     return output;
 }

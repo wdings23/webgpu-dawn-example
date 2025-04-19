@@ -181,24 +181,16 @@ namespace Render
         std::map<std::string, wgpu::TextureView>          maTextureViews;
 
     protected:
-        struct MSDFInfo
-        {
-            int glyphIdx;
-            int left_bearing;
-            int advance;
-            float* rgb;
-            int width;
-            int height;
-            int yOffset;
-        };
-
         struct OutputGlyphInfo
         {
-            MSDFInfo                mSDFResult;
-            uint32_t                miAtlasX;
-            uint32_t                miAtlasY;
-            uint32_t                miASCII;
+            int32_t                width;
+            int32_t                height;
+            int32_t                yOffset;
+            int32_t                miAtlasX;
+            int32_t                miAtlasY;
+            int32_t                miASCII;
         };
+
 
         std::vector<OutputGlyphInfo>    maFontInfo;
 
@@ -211,6 +203,7 @@ namespace Render
 
         void setupFontPipeline();
         void drawText(
+            std::vector<wgpu::CommandBuffer>& aCommandBuffers,
             std::string const& text,
             uint32_t iX,
             uint32_t iY,

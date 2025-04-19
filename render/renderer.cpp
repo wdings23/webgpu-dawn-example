@@ -688,6 +688,7 @@ namespace Render
 #endif // __EMSCRIPTEN__
 
             bufferDesc.size = sizeof(Vertex) * 4;
+            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
             maBuffers["quad-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
             maBuffers["quad-vertex-buffer"].SetLabel("Glyph Quad Vertex Buffer");
             
@@ -707,13 +708,15 @@ namespace Render
             mpDevice->GetQueue().WriteBuffer(maBuffers["quad-vertex-buffer"], 0, aVertices, sizeof(aVertices));
 
             bufferDesc.size = sizeof(uint32_t) * 6;
+            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index;
             maBuffers["quad-index-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
             maBuffers["quad-index-buffer"].SetLabel("Glyph Quad Index Buffer");
 
-            uint32_t aiIndices[6] = {0, 1, 2, 3, 1, 2};
+            uint32_t aiIndices[6] = {0, 1, 2, 3, 2, 0};
             mpDevice->GetQueue().WriteBuffer(maBuffers["quad-index-buffer"], 0, aiIndices, sizeof(aiIndices));
 
             bufferDesc.size = 1024;
+            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
             maBuffers["glyph-coordinates"] = mpDevice->CreateBuffer(&bufferDesc);
             maBuffers["glyph-coordinates"].SetLabel("Glyph Coordinates");
 
@@ -1066,6 +1069,13 @@ namespace Render
 
         }   // for all render jobs
 
+        drawText(
+            aCommandBuffer,
+            "WTF", 
+            900, 
+            20, 
+            16);
+
         // get selection info from shader via read back buffer
         if(mbWaitingForMeshSelection)
         {
@@ -1345,7 +1355,7 @@ namespace Render
         // output texture for draw text
         wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
         wgpu::TextureDescriptor textureDesc = {};
-        textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+        textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment;
         textureDesc.dimension = wgpu::TextureDimension::e2D;
         textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
         textureDesc.mipLevelCount = 1;
@@ -1546,6 +1556,7 @@ namespace Render
     **
     */
     void CRenderer::drawText(
+        std::vector<wgpu::CommandBuffer>& aCommandBuffers,
         std::string const& text, 
         uint32_t iX, 
         uint32_t iY, 
@@ -1558,20 +1569,21 @@ namespace Render
             int32_t        miGlyphIndex;
         };
 
+        uint32_t iBorderSize = 4;
         std::vector<Coord> aGlyphCoord;
         uint32_t iTextLength = (uint32_t)text.length();
         uint32_t iCurrX = iX, iCurrY = iY;
         for(uint32_t i = 0; i < iTextLength; i++)
         {
-            int32_t iGlyphIndex = int32_t(text.at(i)) - 32;
+            int32_t iGlyphIndex = int32_t(text.at(i)) - 33;
 
-            int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].mSDFResult.left_bearing;
-            int32_t iGlyphY = iCurrY + maFontInfo[iGlyphIndex].mSDFResult.yOffset;
+            int32_t iGlyphX = iCurrX + maFontInfo[iGlyphIndex].width / 2;
+            int32_t iGlyphY = iCurrY + maFontInfo[iGlyphIndex].yOffset + maFontInfo[iGlyphIndex].height / 2;
         
             Coord coord = {iGlyphX, iGlyphY, iGlyphIndex};
             aGlyphCoord.push_back(coord);
 
-            iCurrX += maFontInfo[iGlyphIndex].mSDFResult.width;
+            iCurrX += (maFontInfo[iGlyphIndex].width / 2) + iBorderSize;
         }
 
         mpDevice->GetQueue().WriteBuffer(
@@ -1602,16 +1614,14 @@ namespace Render
         renderPassEncoder.SetBindGroup(
             0,
             mFontBindGroup);
-        
-
         renderPassEncoder.SetPipeline(mDrawTextPipeline);
         renderPassEncoder.SetIndexBuffer(
-            maBuffers["train-index-buffer"],
+            maBuffers["quad-index-buffer"],
             wgpu::IndexFormat::Uint32
         );
         renderPassEncoder.SetVertexBuffer(
             0,
-            maBuffers["train-vertex-buffer"]
+            maBuffers["quad-vertex-buffer"]
         );
         renderPassEncoder.SetScissorRect(
             0,
@@ -1626,10 +1636,13 @@ namespace Render
             0.0f,
             1.0f);
         
-        renderPassEncoder.Draw(6);
+        renderPassEncoder.DrawIndexed(6, iTextLength, 0, 0, 0);
          
         renderPassEncoder.PopDebugGroup();
         renderPassEncoder.End();
+
+        wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
+        aCommandBuffers.push_back(commandBuffer);
 
     }
 
