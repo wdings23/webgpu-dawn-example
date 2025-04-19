@@ -265,12 +265,16 @@ void createRenderPipeline()
     // create bind group
     std::vector<wgpu::BindGroupEntry> aBindGroupEntries;
 
+    printf("begin swap chain view\n");
+
     // texture binding in group
     wgpu::BindGroupEntry bindGroupEntry = {};
     bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
     bindGroupEntry.textureView = gRenderer.getSwapChainTexture().CreateView();
     bindGroupEntry.sampler = nullptr;
     aBindGroupEntries.push_back(bindGroupEntry);
+
+    printf("finished swap chain view\n");
 
     // sample binding in group
     bindGroupEntry = {};

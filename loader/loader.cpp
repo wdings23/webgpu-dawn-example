@@ -65,6 +65,49 @@ namespace Loader
 #endif // __EMSCRIPTEN__
 
 #if defined(__EMSCRIPTEN__)
+
+#if defined(EMBEDDED_FILES)
+    uint32_t loadFile(
+        char** pacFileContentBuffer,
+        std::string const& filePath,
+        bool bTextFile)
+    {
+        printf("load %s\n", filePath.c_str());
+        
+        FILE* fp = fopen(filePath.c_str(), "rb");
+        if(fp == nullptr)
+        {
+            std::string newPath = std::string("assets/") + filePath;
+            fp = fopen(newPath.c_str(), "rb");
+            printf("new path: %s\n", newPath.c_str());
+        }
+        assert(fp);
+
+        fseek(fp, 0, SEEK_END);
+        size_t iFileSize = ftell(fp);
+        if(bTextFile)
+        {
+            iFileSize += 1;
+        }
+        fseek(fp, 0, SEEK_SET);
+        
+        printf("file size: %d\n", (uint32_t)iFileSize);
+
+        gacTempMemory = (char*)malloc(iFileSize);
+        fread(gacTempMemory, sizeof(char), iFileSize, fp);
+        if(bTextFile)
+        {
+            *(gacTempMemory + (iFileSize - 1)) = 0;
+        }
+        giTempMemorySize = iFileSize;
+
+        fclose(fp);
+
+        *pacFileContentBuffer = gacTempMemory;
+
+        return (uint32_t)iFileSize;
+    }
+#else
     uint32_t loadFile(
         char** pacFileContentBuffer,
         std::string const& filePath,
@@ -101,6 +144,7 @@ namespace Loader
 
         return giTempMemorySize;
     }
+#endif // EMBEDDED_FILES
 
     void loadFileFree(void* pData)
     {

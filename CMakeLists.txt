@@ -46,7 +46,9 @@ if(EMSCRIPTEN)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
     -g -O3"
   )
+  target_compile_definitions(app PUBLIC EMBEDDED_FILES=1)
   set_target_properties(app PROPERTIES SUFFIX ".html")
+  set_target_properties(app PROPERTIES LINK_FLAGS "--embed-file ../shaders --embed-file ../render-jobs --embed-file ../assets")
   target_link_options(app PRIVATE 
     "-sUSE_WEBGPU=1" 
     "-sUSE_GLFW=3" 
