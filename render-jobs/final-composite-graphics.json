@@ -1,0 +1,51 @@
+{
+    "Type": "Graphics",
+    "PassType": "Full Triangle",
+    "Shader": "final-composite-graphics.shader",
+    "Attachments": [
+        {
+            "Name" : "Final Composite Output",
+            "Type": "TextureOutput",
+            "Format": "rgba32float"
+        },
+        
+        {
+            "Name" : "TAA Output",
+            "Type": "TextureInput",
+            "ParentJob": "TAA Graphics"
+        },
+        {
+            "Name" : "Draw Text Output",
+            "Type": "TextureInput",
+            "ParentJob": "Draw Text Graphics"
+        }
+    ],
+    "ShaderResources": [
+       
+    ],
+    "BlendStates": [
+        {
+            "Enabled": "False"
+        }
+    ],
+    "DepthStencilState":
+    {
+        "DepthEnable": "True",
+        "DepthWriteMask": "One",
+        "DepthFunc": "LessEqual",
+        "StencilEnable": "False"
+    },
+    "RasterState":
+    {
+        "FillMode": "Solid",
+        "CullMode": "None",
+        "FrontFace": "CounterClockwise"
+    },
+    "VertexFormat":
+    [
+        "Vec4",
+        "Vec4",
+        "Vec4"
+    ],
+    "UseGlobalTextures": "True"
+}

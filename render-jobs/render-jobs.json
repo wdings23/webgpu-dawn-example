@@ -69,6 +69,12 @@
             "PassType": "Full Triangle"
         },
         {
+            "Name": "Final Composite Graphics",
+            "Pipeline": "final-composite-graphics.json",
+            "Type": "Graphics",
+            "PassType": "Full Triangle"
+        },
+        {
             "Name": "Copy Render Targets",
             "Pipeline": "copy-render-targets.json",
             "Type": "Copy",
