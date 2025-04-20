@@ -119,6 +119,11 @@ void handleCameraMousePan(
 
 void zoomToSelection();
 
+extern "C" void toggleOutlineRender();
+extern "C" void setSwapChainRender(char const* szRenderJobName, char const* szOutputAttachmentName);
+extern "C" void setExplodePct(float fPct);
+extern "C" void hideSelection();
+extern "C" void showLastHidden();
 
 /*
 **
@@ -265,16 +270,12 @@ void createRenderPipeline()
     // create bind group
     std::vector<wgpu::BindGroupEntry> aBindGroupEntries;
 
-    printf("begin swap chain view\n");
-
     // texture binding in group
     wgpu::BindGroupEntry bindGroupEntry = {};
     bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
     bindGroupEntry.textureView = gRenderer.getSwapChainTexture().CreateView();
     bindGroupEntry.sampler = nullptr;
     aBindGroupEntries.push_back(bindGroupEntry);
-
-    printf("finished swap chain view\n");
 
     // sample binding in group
     bindGroupEntry = {};
@@ -459,6 +460,7 @@ void start()
     giLeftButtonHeld = giRightButtonHeld = 0;
 
     gRenderer.setCameraPositionAndLookAt(gCameraPosition, gCameraLookAt);
+    gRenderer.setSwapChainOutput("Final Composite Graphics", "Final Composite Output");
 
     gState = NORMAL;
 
@@ -684,6 +686,7 @@ void start()
 
             case GLFW_KEY_L:
             {
+#if 0
                 if(gOutlineUniformData.mfDepthThreshold < 1000.0f)
                 {
                     gOutlineUniformData.mfDepthThreshold = 10000.0f;
@@ -703,6 +706,9 @@ void start()
                 data.mpData = &gOutlineUniformData;
 
                 gRenderer.addQueueData(data);
+#endif // 0
+                toggleOutlineRender();
+
                 break;
             }
 
@@ -765,6 +771,12 @@ void start()
                 }
 
 
+                break;
+            }
+
+            case GLFW_KEY_I:
+            {
+                setSwapChainRender("Ambient Occlusion Graphics", "Ambient Occlusion Output");
                 break;
             }
 
@@ -1652,3 +1664,202 @@ void zoomToSelection()
         }
     }
 }
+
+
+
+extern "C"
+{
+    /*
+    **
+    */
+    void toggleOutlineRender()
+    {
+        if(gOutlineUniformData.mfDepthThreshold < 1000.0f)
+        {
+            gOutlineUniformData.mfDepthThreshold = 10000.0f;
+            gOutlineUniformData.mfNormalThreshold = 10000.0f;
+        }
+        else
+        {
+            gOutlineUniformData.mfDepthThreshold = 0.2f;
+            gOutlineUniformData.mfNormalThreshold = 0.2f;
+        }
+
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Outline Graphics";
+        data.mShaderResourceName = "uniformBuffer";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(OutlineUniformData);
+        data.mpData = &gOutlineUniformData;
+
+        gRenderer.addQueueData(data);
+    }
+
+    /*
+    **
+    */
+    void setSwapChainRender(char const* szRenderJobName, char const* szOutputAttachmentName)
+    {
+        DEBUG_PRINTF("set swap chain - render job: \"%s\" output attachment: \"%s\"\n",
+            szRenderJobName,
+            szOutputAttachmentName);
+
+        gRenderer.setSwapChainOutput(
+            szRenderJobName,
+            szOutputAttachmentName);
+
+        std::vector<wgpu::BindGroupEntry> aBindGroupEntries;
+
+        // texture binding in group
+        wgpu::BindGroupEntry bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.textureView = gRenderer.getSwapChainTexture().CreateView();
+        bindGroupEntry.sampler = nullptr;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // sample binding in group
+        bindGroupEntry = {};
+        bindGroupEntry.binding = (uint32_t)aBindGroupEntries.size();
+        bindGroupEntry.sampler = gSampler;
+        aBindGroupEntries.push_back(bindGroupEntry);
+
+        // create bind group
+        wgpu::BindGroupDescriptor bindGroupDesc = {};
+        bindGroupDesc.layout = gBindGroupLayout;
+        bindGroupDesc.entries = aBindGroupEntries.data();
+        bindGroupDesc.entryCount = (uint32_t)aBindGroupEntries.size();
+        gBindGroup = device.CreateBindGroup(&bindGroupDesc);
+    }
+
+    /*
+    **
+    */
+    void setAmbientOcclusionSampleRadius(float fRange)
+    {
+        gAOUniformData.mfSampleRadius = std::max(fRange * 0.1f, 0.0f);
+
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Ambient Occlusion Graphics";
+        data.mShaderResourceName = "uniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(AOUniformData);
+        data.mpData = &gAOUniformData;
+
+        gRenderer.addQueueData(data);
+    }
+
+    /*
+    **
+    */
+    void setAmbientOcclusionThickness(float fThickness)
+    {
+        gAOUniformData.mfThickness = std::max(fThickness * 0.0001f, 0.0f);
+
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Ambient Occlusion Graphics";
+        data.mShaderResourceName = "uniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(AOUniformData);
+        data.mpData = &gAOUniformData;
+
+        gRenderer.addQueueData(data);
+    }
+
+    /*
+    **
+    */
+    void setExplodePct(float fPct)
+    {
+        gDeferredIndirectUniformData.mfExplosionMultiplier = fPct;
+
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Deferred Indirect Graphics";
+        data.mShaderResourceName = "indirectUniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+        data.mpData = &gDeferredIndirectUniformData;
+        gRenderer.addQueueData(data);
+
+        data.mJobName = "Deferred Indirect Front Face Graphics";
+        gRenderer.addQueueData(data);
+    }
+
+    /*
+    **
+    */
+    void hideSelection()
+    {
+        // hide mesh
+        uint32_t iFlag = 0;
+        Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
+        DEBUG_PRINTF("selected mesh %d\n", selectionInfo.miMeshID);
+        if(selectionInfo.miMeshID >= 0)
+        {
+            aiVisibilityFlags[selectionInfo.miMeshID] = 0;
+            gRenderer.setBufferData(
+                "visibilityFlags",
+                aiVisibilityFlags.data(),
+                0,
+                uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
+            );
+            aiHiddenMeshes.push_back(selectionInfo.miMeshID);
+        }
+    }
+
+    /*
+    **
+    */
+    void showLastHidden()
+    {
+        // show last hidden mesh
+        uint32_t iFlag = 1;
+        Render::CRenderer::SelectMeshInfo const& selectionInfo = gRenderer.getSelectionInfo();
+        if(aiHiddenMeshes.size() > 0)
+        {
+            uint32_t iMesh = aiHiddenMeshes.back();
+            aiVisibilityFlags[iMesh] = 1;
+            gRenderer.setBufferData(
+                "visibilityFlags",
+                aiVisibilityFlags.data(),
+                0,
+                uint32_t(aiVisibilityFlags.size() * sizeof(uint32_t))
+            );
+            aiHiddenMeshes.pop_back();
+        }
+    }
+
+    /*
+    **
+    */
+    void setCrossSectionPlane(float fPct)
+    {
+        gDeferredIndirectUniformData.mfCrossSectionPlaneD = length(gMeshMidPt) * -0.75f + ((gfMeshRadius * 1.0f) / 100.0f) * fPct;
+
+        Render::CRenderer::QueueData data;
+        data.mJobName = "Deferred Indirect Graphics";
+        data.mShaderResourceName = "indirectUniformData";
+        data.miStart = 0;
+        data.miSize = (uint32_t)sizeof(DeferredIndirectUniformData);
+        data.mpData = &gDeferredIndirectUniformData;
+        gRenderer.addQueueData(data);
+
+        data.mJobName = "Deferred Indirect Front Face Graphics";
+        gRenderer.addQueueData(data);
+    }
+
+    /*
+    **
+    */
+    void toggleProjectionType()
+    {
+        if(giCameraMode == PROJECTION_PERSPECTIVE)
+        {
+            giCameraMode = PROJECTION_ORTHOGRAPHIC;
+        }
+        else
+        {
+            giCameraMode = PROJECTION_PERSPECTIVE;
+        }
+    }
+
+}   // "C"

@@ -48,8 +48,8 @@ if(EMSCRIPTEN)
     -g -O3"
   )
   target_compile_definitions(app PUBLIC EMBEDDED_FILES=1)
-  set_target_properties(app PROPERTIES SUFFIX ".html")
   set_target_properties(app PROPERTIES LINK_FLAGS "--embed-file ../shaders --embed-file ../render-jobs --embed-file ../assets")
+  set_target_properties(app PROPERTIES SUFFIX ".html")
   target_link_options(app PRIVATE 
     "-sUSE_WEBGPU=1" 
     "-sUSE_GLFW=3" 
@@ -64,7 +64,9 @@ if(EMSCRIPTEN)
     #"-sUSE_PTHREADS=1"
     "-sASSERTIONS"
     "-sSTACK_SIZE=1048576"
-    "-s USE_ZLIB=1")
+    "-sEXPORTED_FUNCTIONS=_main,_toggleOutlineRender,_setSwapChainRender,_setAmbientOcclusionSampleRadius,_setAmbientOcclusionThickness,_setExplodePct,_hideSelection,_showLastHidden,_setCrossSectionPlane,_toggleProjectionType"
+    "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+  )
 else()
   find_package(CURL REQUIRED)
 
