@@ -213,6 +213,19 @@ namespace Render
 
         std::string     mFPSOutput;
         std::chrono::high_resolution_clock::time_point mLastTimeStart;
+
+    protected:
+        std::string mSwapChainRenderJobName;
+        std::string mSwapChainAttachmentName;
+
+    public:
+        inline void setSwapChainOutput(
+            char const* szRenderJobName,
+            char const* szOutputAttachmentName)
+        {
+            mSwapChainRenderJobName = szRenderJobName;
+            mSwapChainAttachmentName = szOutputAttachmentName;
+        }
     };
 
 }   // Render

@@ -1286,7 +1286,7 @@ namespace Render
         //wgpu::Texture& swapChainTexture = maRenderJobs["Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
-        wgpu::Texture& swapChainTexture = maRenderJobs["Final Composite Graphics"]->mOutputImageAttachments["Final Composite Output"];
+        wgpu::Texture& swapChainTexture = maRenderJobs[mSwapChainRenderJobName]->mOutputImageAttachments[mSwapChainAttachmentName];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
 
