@@ -12,12 +12,12 @@
         {
             "Name" : "TAA Output",
             "Type": "TextureInput",
-            "ParentJob": "TAA Graphics"
+            "ParentJobName": "TAA Graphics"
         },
         {
             "Name" : "Draw Text Output",
             "Type": "TextureInput",
-            "ParentJob": "Draw Text Graphics"
+            "ParentJobName": "Draw Text Graphics"
         }
     ],
     "ShaderResources": [

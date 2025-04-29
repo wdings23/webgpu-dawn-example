@@ -52,7 +52,6 @@ namespace Render
             std::string attachmentName = attachment["Name"].GetString();
             std::string attachmentType = attachment["Type"].GetString();
             
-
             std::vector<wgpu::TextureFormat> aViewFormats;
             wgpu::ColorTargetState colorTargetState = {};
             if(attachmentType == "TextureOutput")
@@ -74,13 +73,24 @@ namespace Render
                 }
                 aViewFormats.push_back(format);
 
+                float fScaleX = 1.0f, fScaleY = 1.0f;
+                if(attachment.HasMember("ScaleWidth"))
+                {
+                    fScaleX = attachment["ScaleWidth"].GetFloat();
+                }
+
+                if(attachment.HasMember("ScaleHeight"))
+                {
+                    fScaleY = attachment["ScaleHeight"].GetFloat();
+                }
+
                 // create texture
                 wgpu::TextureDescriptor textureDescriptor = {};
                 textureDescriptor.format = format;
                 textureDescriptor.label = attachmentName.c_str();
                 textureDescriptor.dimension = wgpu::TextureDimension::e2D;
-                textureDescriptor.size.width = createInfo.miScreenWidth;
-                textureDescriptor.size.height = createInfo.miScreenHeight;
+                textureDescriptor.size.width = uint32_t((float)createInfo.miScreenWidth * fScaleX);
+                textureDescriptor.size.height = uint32_t((float)createInfo.miScreenHeight * fScaleY);
                 textureDescriptor.size.depthOrArrayLayers = 1;
                 textureDescriptor.mipLevelCount = 1;
                 textureDescriptor.sampleCount = 1;
@@ -163,10 +173,17 @@ namespace Render
             auto const& aShaderResources = doc["ShaderResources"].GetArray();
             for(auto const& shaderResource : aShaderResources)
             {
-                std::string shaderResourceName = shaderResource["name"].GetString();
-                std::string shaderResourceType = shaderResource["type"].GetString();
-                std::string shaderUsage = shaderResource["usage"].GetString();
-                if(shaderResourceType == "buffer")
+                std::map<std::string, std::string> uniformInfo;
+                uniformInfo["name"] = shaderResource["name"].GetString();
+                uniformInfo["type"] = shaderResource["type"].GetString();
+                uniformInfo["usage"] = shaderResource["usage"].GetString();
+                uniformInfo["sample"] = "float";
+                if(shaderResource.HasMember("sample"))
+                {
+                    uniformInfo["sample"] = shaderResource["sample"].GetString();
+                }
+
+                if(uniformInfo["type"] == "buffer")
                 {
                     uint32_t iSize = 0;
                     if(shaderResource.HasMember("size") || shaderResource.HasMember("external") == false)
@@ -176,40 +193,44 @@ namespace Render
                         std::string shaderStage = shaderResource["shader_stage"].GetString();
 
                         wgpu::BufferDescriptor bufferDesc = {};
-                        bufferDesc.label = shaderResourceName.c_str();
+                        bufferDesc.label = uniformInfo["name"].c_str();
                         bufferDesc.size = iSize;
-                        if(shaderUsage == "read_only_storage")
+                        if(uniformInfo["usage"] == "read_only_storage")
                         {
                             bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
                         }
-                        else if(shaderUsage == "uniform")
+                        else if(uniformInfo["usage"] == "uniform")
                         {
                             bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
                         }
-                        else if(shaderUsage == "read_write_storage")
+                        else if(uniformInfo["usage"] == "read_write_storage")
+                        {
+                            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+                        }
+                        else if(uniformInfo["usage"] == "write_only_storage")
                         {
                             bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
                         }
 
-                        mUniformBuffers[shaderResourceName] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
+                        mUniformBuffers[uniformInfo["name"]] = createInfo.mpDevice->CreateBuffer(&bufferDesc);
                     }
                     else
                     {
                         uint32_t iBufferSize = 0;
-                        mUniformBuffers[shaderResourceName] = createInfo.mpfnGetBuffer(iBufferSize, shaderResourceName, createInfo.mpUserData);
+                        mUniformBuffers[uniformInfo["name"]] = createInfo.mpfnGetBuffer(iBufferSize, uniformInfo["name"], createInfo.mpUserData);
                     }
                 }
-                else if(shaderResourceType == "texture")
+                else if(uniformInfo["type"] == "texture")
                 {
                     std::string shaderStage = shaderResource["shader_stage"].GetString();
                     bool bExternalTexture = false;
                     if(shaderResource.HasMember("external"))
                     {
-                        bExternalTexture = true;
+                        mUniformTextures[uniformInfo["name"]] = createInfo.mpfnGetTexture(uniformInfo["name"], createInfo.mpUserData);
                     }
                 }
 
-                mUniformOrder.push_back(std::make_pair(shaderResourceName, std::make_pair(shaderResourceType, shaderUsage)));
+                mUniformOrder.push_back(uniformInfo);
 
             }   // for shader
         }
@@ -504,12 +525,14 @@ namespace Render
                     parentAttachmentName = attachment["ParentName"].GetString();
                 }
 
-                std::string attachmentParentJobName = attachment["ParentJob"].GetString();
+                std::string attachmentParentJobName = attachment["ParentJobName"].GetString();
 
+                bool bFound = false;
                 for(auto const& renderJob : aRenderJobs)
                 {
                     if(attachmentParentJobName == renderJob->mName)
                     {
+                        bFound = true;
                         if(renderJob->mOutputImageAttachments.find(parentAttachmentName) != renderJob->mOutputImageAttachments.end())
                         {
                             if(attachmentName == "Depth Output" && mPassType == PassType::DrawMeshes)
@@ -535,7 +558,50 @@ namespace Render
                 if(attachmentParentJobName == "Draw Text Graphics")
                 {
                     mInputImageAttachments[attachmentName] = createInfo.mpDrawTextOutputAttachment;
+                    bFound = true;
                 }
+
+                assert(bFound);
+
+            }   // if attachment type == Texture input
+            if(attachmentType == "BufferInput" || attachmentType == "BufferInputOutput")
+            {
+                std::string attachmentName = attachment["Name"].GetString();
+                std::string parentAttachmentName = attachmentName;
+                if(attachment.HasMember("ParentName"))
+                {
+                    parentAttachmentName = attachment["ParentName"].GetString();
+                }
+
+                std::string attachmentParentJobName = attachment["ParentJobName"].GetString();
+
+                bool bFound = false;
+                for(auto const& renderJob : aRenderJobs)
+                {
+                    if(attachmentParentJobName == renderJob->mName)
+                    {
+                        bFound = true;
+                        if(renderJob->mOutputBufferAttachments.find(parentAttachmentName) != renderJob->mOutputBufferAttachments.end())
+                        {
+                            mInputBufferAttachments[attachmentName] = &renderJob->mOutputBufferAttachments[parentAttachmentName];
+                            
+                            break;
+                        }
+                        else
+                        {
+                            assert(!"Can\'t find input attachment");
+                        }
+                    }
+
+                }   // for render job in all render jobs
+
+                if(attachmentParentJobName == "Draw Text Graphics")
+                {
+                    mInputImageAttachments[attachmentName] = createInfo.mpDrawTextOutputAttachment;
+                    bFound = true;
+                }
+
+                assert(bFound);
 
             }   // if attachment type == Texture input
 
@@ -647,6 +713,10 @@ namespace Render
                 bindingLayout.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
                 bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
                 bindingLayout.visibility = wgpu::ShaderStage::Fragment;
+                if(mType == Render::JobType::Compute)
+                {
+                    bindingLayout.visibility = wgpu::ShaderStage::Compute;
+                }
 
                 wgpu::TextureView textureView = mInputImageAttachments[attachmentName]->CreateView();
                 bindGroupEntry.textureView = textureView;
@@ -671,7 +741,7 @@ namespace Render
             else if(attachmentType == "BufferInput")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-                bindingLayout.buffer.minBindingSize = 64;
+                bindingLayout.buffer.minBindingSize = 0;
                 bindingLayout.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
                 if(mType == Render::JobType::Compute)
                 {
@@ -686,7 +756,7 @@ namespace Render
             else if(attachmentType == "BufferOutput")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::Storage;
-                bindingLayout.buffer.minBindingSize = 64;
+                bindingLayout.buffer.minBindingSize = 0;
                 bindingLayout.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
                 if(mType == Render::JobType::Compute)
                 {
@@ -708,11 +778,11 @@ namespace Render
 
         // shader resouces in group 1
         iIndex = 0;
-        for(auto const& uniformInfo : mUniformOrder)
+        for(auto& uniformInfo : mUniformOrder)
         {
-            std::string const& uniformName = uniformInfo.first;
-            std::string const& uniformType = uniformInfo.second.first;
-            std::string const& uniformUsage = uniformInfo.second.second;
+            std::string const& uniformName = uniformInfo["name"];
+            std::string const& uniformType = uniformInfo["type"];
+            std::string const& uniformUsage = uniformInfo["usage"];
 
             wgpu::BindGroupEntry bindGroupEntry = {};
             wgpu::BindGroupLayoutEntry bindingLayout = {};
@@ -721,23 +791,26 @@ namespace Render
             bindGroupEntry.binding = iIndex;
             if(uniformType == "texture")
             {
-                bindingLayout.texture.multisampled = false;
-                bindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
-                bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
-
-                if(uniformUsage == "texture_array")
+                if(uniformUsage == "write_only_storage")
                 {
-                    if(uniformName == "totalDiffuseTextures")
-                    {
-                        bindGroupEntry.textureView = *createInfo.mpTotalDiffuseTextureView;
-                    }
+                    bindingLayout.storageTexture.access = wgpu::StorageTextureAccess::WriteOnly;
+                    bindingLayout.storageTexture.format = wgpu::TextureFormat::RGBA32Float;
+                    bindingLayout.storageTexture.viewDimension = wgpu::TextureViewDimension::e2D;
                 }
                 else
                 {
-                    bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
-                }
-                
+                    bindingLayout.texture.multisampled = false;
+                    bindingLayout.texture.sampleType = wgpu::TextureSampleType::Float;
+                    bindingLayout.texture.viewDimension = wgpu::TextureViewDimension::e2D;
 
+                    if(uniformInfo["sample"] == "unfilterable_float")
+                    {
+                        bindingLayout.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+                    }
+                }
+
+                bindGroupEntry.textureView = mUniformTextures[uniformName].CreateView();
+                
                 DEBUG_PRINTF("\tgroup 1 binding %d texture \"%s\"\n",
                     (uint32_t)aaBindGroupLayoutEntries[1].size(),
                     uniformName.c_str());
@@ -745,7 +818,7 @@ namespace Render
             else if(uniformType == "buffer")
             {
                 bindingLayout.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
-                bindingLayout.buffer.minBindingSize = 64;
+                bindingLayout.buffer.minBindingSize = 0; // 64;
             
                 if(uniformUsage == "read_write_storage")
                 {
@@ -774,7 +847,7 @@ namespace Render
             }
             else
             {
-                if(uniformUsage == "read_write_storage")
+                if(uniformUsage == "read_write_storage" || uniformUsage == "write_only_storage")
                 {
                     bindingLayout.visibility = wgpu::ShaderStage::Fragment;
                 }
@@ -897,8 +970,8 @@ namespace Render
                 depthStencilDesc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
                 depthStencilDesc.format = wgpu::TextureFormat::Depth32Float;
                 depthStencilDesc.viewFormats = &mDepthStencilViewFormat;
-                depthStencilDesc.size.width = createInfo.miScreenWidth;
-                depthStencilDesc.size.height = createInfo.miScreenHeight;
+                depthStencilDesc.size.width = mOutputImageAttachments.begin()->second.GetWidth();
+                depthStencilDesc.size.height = mOutputImageAttachments.begin()->second.GetHeight();
                 depthStencilDesc.size.depthOrArrayLayers = 1;
                 mDepthStencilTexture = createInfo.mpDevice->CreateTexture(&depthStencilDesc);
                 mOutputImageAttachments["Depth Output"] = mDepthStencilTexture;

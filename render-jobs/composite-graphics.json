@@ -12,32 +12,32 @@
         {
             "Name" : "Ambient Occlusion Output",
             "Type": "TextureInput",
-            "ParentJob": "Ambient Occlusion Graphics"
+            "ParentJobName": "Ambient Occlusion Graphics"
         },
         {
             "Name" : "PBR Output",
             "Type": "TextureInput",
-            "ParentJob": "PBR Graphics"
+            "ParentJobName": "PBR Graphics"
         },
         {
             "Name" : "Selection Output",
             "Type": "TextureInput",
-            "ParentJob": "Mesh Selection Graphics"
+            "ParentJobName": "Mesh Selection Graphics"
         },
         {
             "Name" : "Clean Output",
             "Type": "TextureInput",
-            "ParentJob": "Cross Section Cleanup Graphics"
+            "ParentJobName": "Cross Section Cleanup Graphics"
         },
         {
             "Name" : "Indirect Lighting Output",
             "Type": "TextureInput",
-            "ParentJob": "Ambient Occlusion Graphics"
+            "ParentJobName": "Ambient Occlusion Graphics"
         },
         {
             "Name" : "Line Output",
             "Type": "TextureInput",
-            "ParentJob": "Outline Graphics"
+            "ParentJobName": "Outline Graphics"
         }
     ],
     "ShaderResources": [

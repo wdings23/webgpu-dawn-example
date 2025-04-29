@@ -21,22 +21,22 @@
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Normal Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Texture Coordinate And Clip Space Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name": "PBR Output",
             "Type": "TextureInput",
-            "ParentJob": "PBR Graphics"
+            "ParentJobName": "PBR Graphics"
         }
     ],
     "ShaderResources": [

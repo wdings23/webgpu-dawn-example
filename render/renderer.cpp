@@ -61,8 +61,6 @@ struct DefaultUniformData
 
     float4 mLightRadiance;
     float4 mLightDirection;
-
-    float mfAmbientOcclusionDistanceThreshold = 0.0f;
 };
 
 
@@ -114,619 +112,19 @@ namespace Render
         mpDevice = desc.mpDevice;
         wgpu::Device& device = *mpDevice;
 
-        
-#if defined(__EMSCRIPTEN__)
-        char* acTriangleBuffer = nullptr;
-        uint64_t iSize = Loader::loadFile(&acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
-        printf("acTriangleBuffer = 0x%X size: %lld\n", (uint32_t)acTriangleBuffer, iSize);
-        uint32_t const* piData = (uint32_t const*)acTriangleBuffer;
-#else 
-        std::vector<char> acTriangleBuffer;
-        Loader::loadFile(acTriangleBuffer, desc.mMeshFilePath + "-triangles.bin");
-        uint32_t const* piData = (uint32_t const*)acTriangleBuffer.data();
-#endif // __EMSCRIPTEN__
-        
-        uint32_t iNumMeshes = *piData++;
-        uint32_t iNumTotalVertices = *piData++;
-        uint32_t iNumTotalTriangles = *piData++;
-        uint32_t iVertexSize = *piData++;
-        uint32_t iTriangleStartOffset = *piData++;
-
-        printf("num meshes: %d\n", iNumMeshes);
-        printf("num total vertices: %d\n", iNumTotalVertices);
-
-        // triangle ranges for all the meshes
-        maMeshTriangleRanges.resize(iNumMeshes);
-        memcpy(maMeshTriangleRanges.data(), piData, sizeof(MeshTriangleRange) * iNumMeshes);
-        piData += (2 * iNumMeshes);
-
-        // the total mesh extent is at the very end of the list
-        MeshExtent const* pMeshExtent = (MeshExtent const*)piData;
-        maMeshExtents.resize(iNumMeshes + 1);
-        memcpy(maMeshExtents.data(), pMeshExtent, sizeof(MeshExtent) * (iNumMeshes + 1));
-        pMeshExtent += (iNumMeshes + 1);
-        mTotalMeshExtent = maMeshExtents.back();
-
-        // all the mesh vertices
-        std::vector<Vertex> aTotalMeshVertices(iNumTotalVertices);
-        Vertex const* pVertices = (Vertex const*)pMeshExtent;
-        memcpy(aTotalMeshVertices.data(), pVertices, iNumTotalVertices * sizeof(Vertex));
-        pVertices += iNumTotalVertices;
-
-        // all the triangle indices
-        std::vector<uint32_t> aiTotalMeshTriangleIndices(iNumTotalTriangles * 3);
-        piData = (uint32_t const*)pVertices;
-        memcpy(aiTotalMeshTriangleIndices.data(), piData, iNumTotalTriangles * 3 * sizeof(uint32_t));
-
-#if defined(__EMSCRIPTEN__)
-        Loader::loadFileFree(acTriangleBuffer);
-#endif // __EMSCRIPTEN__
-
-        wgpu::BufferDescriptor bufferDesc = {};
-
-        bufferDesc.size = iNumTotalVertices * sizeof(Vertex);
-        bufferDesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["train-vertex-buffer"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["train-vertex-buffer"].SetLabel("Train Vertex Buffer");
-        maBufferSizes["train-vertex-buffer"] = (uint32_t)bufferDesc.size;
-
-        bufferDesc.size = aiTotalMeshTriangleIndices.size() * sizeof(uint32_t);
-        bufferDesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["train-index-buffer"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["train-index-buffer"].SetLabel("Train Index Buffer");
-        maBufferSizes["train-index-buffer"] = (uint32_t)bufferDesc.size;
-
-        bufferDesc.size = iNumTotalVertices * sizeof(Vertex);
-        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["meshTriangleIndexRanges"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["meshTriangleIndexRanges"].SetLabel("Mesh Triangle Ranges");
-        maBufferSizes["meshTriangleIndexRanges"] = (uint32_t)bufferDesc.size;
-
-        bufferDesc.size = (iNumMeshes + 1) * sizeof(MeshExtent);
-        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["meshExtents"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["meshExtents"].SetLabel("Train Mesh Extents");
-        maBufferSizes["meshExtents"] = (uint32_t)bufferDesc.size;
-
-        device.GetQueue().WriteBuffer(maBuffers["train-vertex-buffer"], 0, aTotalMeshVertices.data(), iNumTotalVertices * sizeof(Vertex));
-        device.GetQueue().WriteBuffer(maBuffers["train-index-buffer"], 0, aiTotalMeshTriangleIndices.data(), aiTotalMeshTriangleIndices.size() * sizeof(uint32_t));
-        device.GetQueue().WriteBuffer(maBuffers["meshTriangleIndexRanges"], 0, maMeshTriangleRanges.data(), maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
-        device.GetQueue().WriteBuffer(maBuffers["meshExtents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
-
-        {
-#if defined(__EMSCRIPTEN__)
-            char* acMaterialID = nullptr;
-            bufferDesc.size = Loader::loadFile(&acMaterialID, desc.mMeshFilePath + ".mid");
-#else 
-
-            std::vector<char> acMaterialID;
-            Loader::loadFile(acMaterialID, desc.mMeshFilePath + ".mid");
-            bufferDesc.size = acMaterialID.size();
-#endif // __EMSCRIPTEN__
-
-            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-            maBuffers["meshMaterialIDs"] = device.CreateBuffer(&bufferDesc);
-            maBuffers["meshMaterialIDs"].SetLabel("Mesh Material IDs");
-            maBufferSizes["meshEmeshMaterialIDsxtents"] = (uint32_t)bufferDesc.size;
-
-#if defined(__EMSCRIPTEN__)
-            device.GetQueue().WriteBuffer(
-                maBuffers["meshMaterialIDs"],
-                0,
-                acMaterialID,
-                bufferDesc.size);
-            Loader::loadFileFree(acMaterialID);
-#else
-            device.GetQueue().WriteBuffer(
-                maBuffers["meshMaterialIDs"],
-                0,
-                acMaterialID.data(),
-                acMaterialID.size());
-#endif // __EMSCRIPTEN__
-        }
-
-        {
-#if defined(__EMSCRIPTEN__)
-            char* acMaterials = nullptr;
-            bufferDesc.size = Loader::loadFile(&acMaterials, desc.mMeshFilePath + ".mat");
-            printf("mesh material size: %d\n", (uint32_t)bufferDesc.size);
-#else
-            std::vector<char> acMaterials;
-            Loader::loadFile(acMaterials, desc.mMeshFilePath + ".mat");
-
-            bufferDesc.size = acMaterials.size();
-#endif // __EMSCRIPTEN__
-            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-            maBuffers["meshMaterials"] = device.CreateBuffer(&bufferDesc);
-            maBuffers["meshMaterials"].SetLabel("Mesh Materials");
-            maBufferSizes["meshMaterials"] = (uint32_t)bufferDesc.size;
-
-#if defined(__EMSCRIPTEN__)
-            device.GetQueue().WriteBuffer(
-                maBuffers["meshMaterials"],
-                0,
-                acMaterials,
-                bufferDesc.size);
-            Loader::loadFileFree(acMaterials);
-#else 
-            device.GetQueue().WriteBuffer(
-                maBuffers["meshMaterials"],
-                0,
-                acMaterials.data(),
-                acMaterials.size());
-#endif // __EMSCRIPTEN__
-        }
-
-        bufferDesc.size = iNumMeshes * sizeof(uint32_t);
-        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["visibilityFlags"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["visibilityFlags"].SetLabel("Mesh Visibility Flags");
-        maBufferSizes["visibilityFlags"] = (uint32_t)bufferDesc.size;
-
-        // default uniform buffer
-        bufferDesc.size = sizeof(DefaultUniformData);
-        bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
-        maBuffers["default-uniform-buffer"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["default-uniform-buffer"].SetLabel("Default Uniform Buffer");
-        maBufferSizes["default-uniform-buffer"] = (uint32_t)bufferDesc.size;
-
-        // full screen triangle
-        Vertex aFullScreenTriangles[3];
-        aFullScreenTriangles[0].mPosition = float4(-1.0f, 3.0f, 0.0f, 1.0f);
-        aFullScreenTriangles[0].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-        aFullScreenTriangles[0].mUV = float4(0.0f, -1.0f, 0.0f, 0.0f);
-
-        aFullScreenTriangles[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
-        aFullScreenTriangles[1].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-        aFullScreenTriangles[1].mUV = float4(0.0f, 1.0f, 0.0f, 0.0f);
-
-        aFullScreenTriangles[2].mPosition = float4(3.0f, -1.0f, 0.0f, 1.0f);
-        aFullScreenTriangles[2].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-        aFullScreenTriangles[2].mUV = float4(2.0f, 1.0f, 0.0f, 0.0f);
-
-        bufferDesc.size = sizeof(Vertex) * 3;
-        maBuffers["full-screen-triangle"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["full-screen-triangle"].SetLabel("Full Screen Triangle Buffer");
-        maBufferSizes["full-screen-triangle"] = (uint32_t)bufferDesc.size;
-        device.GetQueue().WriteBuffer(
-            maBuffers["full-screen-triangle"], 
-            0, 
-            aFullScreenTriangles, 
-            3 * sizeof(Vertex));
-
-        bufferDesc.size = 256 * sizeof(float2);
-        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
-        maBuffers["blueNoiseBuffer"] = device.CreateBuffer(&bufferDesc);
-        maBuffers["blueNoiseBuffer"].SetLabel("Blue Noise Buffer");
-        maBufferSizes["blueNoiseBuffer"] = (uint32_t)bufferDesc.size;
-
         mpSampler = desc.mpSampler;
-        
-        struct TextureAtlasInfo
-        {
-            uint2               miTextureCoord;
-            float2              mUV;
-            uint32_t            miTextureID;
-            uint32_t            miImageWidth;
-            uint32_t            miImageHeight;
-            uint32_t            miPadding0;
-        };
 
-        std::vector<TextureAtlasInfo> aTextureAtlasInfo;
-        std::vector<std::string> aDiffuseTextureNames;
-        std::vector<std::string> aEmissiveTextureNames;
-        std::vector<std::string> aSpecularTextureNames;
-        std::vector<std::string> aNormalTextureNames;
-        {
-            // diffuse texture atlas
-            int32_t iAtlasImageWidth = 8192;
-            int32_t iAtlasImageHeight = 8192;
-            wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
-            wgpu::TextureDescriptor textureDesc = {};
-            textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
-            textureDesc.dimension = wgpu::TextureDimension::e2D;
-            textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-            textureDesc.mipLevelCount = 1;
-            textureDesc.sampleCount = 1;
-            textureDesc.size.depthOrArrayLayers = 1;
-            textureDesc.size.width = iAtlasImageWidth;
-            textureDesc.size.height = iAtlasImageHeight;
-            textureDesc.viewFormatCount = 1;
-            textureDesc.viewFormats = aViewFormats;
-            mDiffuseTextureAtlas = device.CreateTexture(&textureDesc);
+        createMiscBuffers();
 
-            
-#if defined(__EMSCRIPTEN__)
-            char* acTextureNames = nullptr;
-            uint32_t iSize = Loader::loadFile(&acTextureNames, desc.mMeshFilePath + "-texture-names.tex");
-            if(iSize > 0)
-#else 
-            std::vector<char> acTextureNames;
-            Loader::loadFile(acTextureNames, desc.mMeshFilePath + "-texture-names.tex");
-            if(acTextureNames.size() > 0)
-#endif // __EMSCRIPTEN__
-            {
-                uint32_t iDiffuseSignature = ('D') | ('F' << 8) | ('S' << 16) | ('E' << 24);
-                uint32_t iEmissiveSignature = ('E') | ('M' << 8) | ('S' << 16) | ('V' << 24);
-                uint32_t iSpecularSignature = ('S') | ('P' << 8) | ('C' << 16) | ('L' << 24);
-                uint32_t iNormalSignature = ('N') | ('R' << 8) | ('M' << 16) | ('L' << 24);
-
-#if defined(__EMSCRIPTEN__)
-                uint32_t const* piData = (uint32_t const*)acTextureNames;
-                char const* pcEnd = ((char const*)piData) + iSize;
-#else 
-                uint32_t const* piData = (uint32_t const*)acTextureNames.data();
-                char const* pcEnd = ((char const*)piData) + acTextureNames.size();
-#endif // __EMSCRIPTEN__
-                for(uint32_t iType = 0; iType < 4; iType++)
-                {
-                    uint32_t iSignature = *piData++;
-                    uint32_t iNumTextures = *piData++;
-                    char const* pcChar = (char const*)piData;
-                    for(uint32_t i = 0; i < iNumTextures; i++)
-                    {
-                        std::vector<char> acName;
-                        while(*pcChar != '\0')
-                        {
-                            acName.push_back(*pcChar++);
-                        }
-                        acName.push_back(*pcChar++);
-
-                        std::string convertedName = std::string(acName.data());
-                        auto iter = convertedName.rfind("/");
-                        if(iter == std::string::npos)
-                        {
-                            iter = convertedName.rfind("\\");
-                        }
-
-                        std::string baseName = convertedName;
-                        if(iter != std::string::npos)
-                        {
-                            baseName = convertedName.substr(iter);
-                        }
-                        iter = baseName.rfind(".");
-                        std::string noExtension = baseName.substr(0, iter);
-                        noExtension += ".png";
-
-                        if(iSignature == iDiffuseSignature)
-                        {
-                            aDiffuseTextureNames.push_back(noExtension);
-                        }
-                        else if(iSignature == iEmissiveSignature)
-                        {
-                            aEmissiveTextureNames.push_back(noExtension);
-                        }
-                        else if(iSignature == iSpecularSignature)
-                        {
-                            aSpecularTextureNames.push_back(noExtension);
-                        }
-                        else if(iSignature == iNormalSignature)
-                        {
-                            aNormalTextureNames.push_back(noExtension);
-                        }
-                    }
-                    piData = (uint32_t const*)pcChar;
-                    if(pcChar == pcEnd)
-                    {
-                        break;
-                    }
-
-                }   // for texture type
-
-#if defined(__EMSCRIPTEN__)
-                free(acTextureNames);
-#endif // __EMSCRIPTEN__
-
-                int32_t iAtlasIndex = 0;
-                int32_t iX = 0, iY = 0;
-                int32_t iLargestHeight = 0;
-
-                auto copyToAtlas = [&](
-                    int32_t& iX,
-                    int32_t& iY,
-                    int32_t iAtlasImageWidth,
-                    int32_t iAtlasImageHeight,
-                    std::string const& textureName,
-                    wgpu::Texture& textureAtlas,
-                    int32_t& iLargestHeight)
-                    {
-                        std::string parsedTextureName = std::string("textures/") + textureName;
-
-#if defined(__EMSCRIPTEN__)
-                        char* acTextureImageData = nullptr;
-                        uint32_t iSize = Loader::loadFile(&acTextureImageData, parsedTextureName);
-                        int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
-                        stbi_uc* pImageData = stbi_load_from_memory(
-                            (stbi_uc const*)acTextureImageData,
-                            (int32_t)iSize,
-                            &iImageWidth,
-                            &iImageHeight,
-                            &iImageComp,
-                            4
-                        );
-#else
-                        std::vector<char> acTextureImageData;
-                        Loader::loadFile(acTextureImageData, parsedTextureName);
-                        int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
-                        stbi_uc* pImageData = stbi_load_from_memory(
-                            (stbi_uc const*)acTextureImageData.data(),
-                            (int32_t)acTextureImageData.size(),
-                            &iImageWidth,
-                            &iImageHeight,
-                            &iImageComp,
-                            4
-                        );
-#endif // __EMSCRIPTEN__
-
-                        if(pImageData)
-                        {
-                            iLargestHeight = std::max(iLargestHeight, iImageHeight);
-                            if(iX + iImageWidth >= iAtlasImageWidth)
-                            {
-                                iX = 0;
-                                iY += iLargestHeight;
-                                iLargestHeight = 0;
-                            }
-
-#if defined(__EMSCRIPTEN__)
-                            wgpu::TextureDataLayout layout = {};
-#else
-                            wgpu::TexelCopyBufferLayout layout = {};
-#endif // __EMSCRIPTEN__
-                            layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
-                            layout.offset = 0;
-                            layout.rowsPerImage = iImageHeight;
-                            wgpu::Extent3D extent = {};
-                            extent.depthOrArrayLayers = 1;
-                            extent.width = iImageWidth;
-                            extent.height = iImageHeight;
-
-#if defined(__EMSCRIPTEN__)
-                            wgpu::ImageCopyTexture destination = {};
-#else 
-                            wgpu::TexelCopyTextureInfo destination = {};
-#endif // __EMSCRIPTEN__
-                            destination.aspect = wgpu::TextureAspect::All;
-                            destination.mipLevel = 0;
-                            destination.origin = {.x = (uint32_t)iX, .y = (uint32_t)iY, .z = 0};
-                            destination.texture = textureAtlas;
-                            device.GetQueue().WriteTexture(
-                                &destination,
-                                pImageData,
-                                iImageWidth * iImageHeight * 4,
-                                &layout,
-                                &extent);
-
-                            TextureAtlasInfo info = {};
-                            info.miTextureCoord = uint2(iX, iY);
-                            info.miTextureID = iAtlasIndex;
-                            info.mUV = float2(float(iX) / float(iAtlasImageWidth), float(iY) / float(iAtlasImageHeight));
-                            info.miImageWidth = iImageWidth;
-                            info.miImageHeight = iImageHeight;
-                            aTextureAtlasInfo.push_back(info);
-
-                            iX += iImageWidth;
-
-                            stbi_image_free(pImageData);
-
-#if defined(__EMSCRIPTEN__)
-                            free(acTextureImageData);
-#endif // __EMSCRIPTEN__
-                        }
-                    };
-
-
-                for(auto const& diffuseTextureName : aDiffuseTextureNames)
-                {
-                    copyToAtlas(iX, iY, iAtlasImageWidth, iAtlasImageHeight, diffuseTextureName, mDiffuseTextureAtlas, iLargestHeight);
-
-                    ++iAtlasIndex;
-                }
-
-            }
-
-        }   // textures
-
-        wgpu::TextureViewDescriptor viewDesc = {};
-        viewDesc.arrayLayerCount = 1;
-        viewDesc.aspect = wgpu::TextureAspect::All;
-        viewDesc.baseArrayLayer = 0;
-        viewDesc.baseMipLevel = 0;
-        viewDesc.dimension = wgpu::TextureViewDimension::e2D;
-        viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-        viewDesc.label = "Diffuse Texture Atlas";
-        viewDesc.mipLevelCount = 1;
-#if !defined(__EMSCRIPTEN__)
-        viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
-#endif // __EMSCRIPTEN__
-        mDiffuseTextureAtlasView = mDiffuseTextureAtlas.CreateView(&viewDesc);
-
-        bufferDesc = {};
-        bufferDesc.mappedAtCreation = false;
-        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
-        bufferDesc.size = std::max((uint32_t)sizeof(TextureAtlasInfo) * (uint32_t)aTextureAtlasInfo.size(), 64u);
-        maBuffers["diffuseTextureAtlasInfoBuffer"] = mpDevice->CreateBuffer(&bufferDesc);
-        maBuffers["diffuseTextureAtlasInfoBuffer"].SetLabel("Diffuse Texture Atlas Info Buffer");
-        device.GetQueue().WriteBuffer(
-            maBuffers["diffuseTextureAtlasInfoBuffer"],
-            0,
-            aTextureAtlasInfo.data(),
-            sizeof(TextureAtlasInfo)* (uint32_t)aTextureAtlasInfo.size()
-        );
-
-        // font atlas
-        {
-#if defined(__EMSCRIPTEN__)
-            char* acAtlasImageData = nullptr;
-            uint32_t iFileSize = Loader::loadFile(&acAtlasImageData, "font-atlas.png");
-#else 
-            std::vector<char> acAtlasImageDataV;
-            Loader::loadFile(acAtlasImageDataV, "font-atlas.png");
-            char* acAtlasImageData = acAtlasImageDataV.data();
-            uint32_t iFileSize = (uint32_t)acAtlasImageDataV.size();
-#endif // __EMSCRIPTEN__
-
-            int32_t iImageWidth = 0, iImageHeight = 0, iNumComp = 0;
-            stbi_uc* pImageData = stbi_load_from_memory(
-                (stbi_uc const*)acAtlasImageData,
-                (int32_t)iFileSize,
-                &iImageWidth,
-                &iImageHeight,
-                &iNumComp,
-                4
-            );
-
-            wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
-            wgpu::TextureDescriptor textureDesc = {};
-            textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
-            textureDesc.dimension = wgpu::TextureDimension::e2D;
-            textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-            textureDesc.mipLevelCount = 1;
-            textureDesc.sampleCount = 1;
-            textureDesc.size.depthOrArrayLayers = 1;
-            textureDesc.size.width = iImageWidth;
-            textureDesc.size.height = iImageHeight;
-            textureDesc.viewFormatCount = 1;
-            textureDesc.viewFormats = aViewFormats;
-            maTextures["font-atlas-image"] = mpDevice->CreateTexture(&textureDesc);
-            maTextures["font-atlas-image"].SetLabel("Font Atlas");
-
-#if defined(__EMSCRIPTEN__)
-            wgpu::TextureDataLayout layout = {};
-#else
-            wgpu::TexelCopyBufferLayout layout = {};
-#endif // __EMSCRIPTEN__
-            layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
-            layout.offset = 0;
-            layout.rowsPerImage = iImageHeight;
-            wgpu::Extent3D extent = {};
-            extent.depthOrArrayLayers = 1;
-            extent.width = iImageWidth;
-            extent.height = iImageHeight;
-
-#if defined(__EMSCRIPTEN__)
-            wgpu::ImageCopyTexture destination = {};
-#else 
-            wgpu::TexelCopyTextureInfo destination = {};
-#endif // __EMSCRIPTEN__
-            destination.aspect = wgpu::TextureAspect::All;
-            destination.mipLevel = 0;
-            destination.origin = {.x = 0, .y = 0, .z = 0, };
-            destination.texture = maTextures["font-atlas-image"];
-            device.GetQueue().WriteTexture(
-                &destination,
-                pImageData,
-                iImageWidth * iImageHeight * 4,
-                &layout,
-                &extent);
-            stbi_image_free(pImageData);
-
-            wgpu::TextureViewDescriptor viewDesc = {};
-            viewDesc.arrayLayerCount = 1;
-            viewDesc.aspect = wgpu::TextureAspect::All;
-            viewDesc.baseArrayLayer = 0;
-            viewDesc.baseMipLevel = 0;
-            viewDesc.dimension = wgpu::TextureViewDimension::e2D;
-            viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-            viewDesc.label = "Font Texture Atlas";
-            viewDesc.mipLevelCount = 1;
-#if !defined(__EMSCRIPTEN__)
-            viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
-#endif // __EMSCRIPTEN__
-            maTextureViews["font-atlas-image"] = maTextures["font-atlas-image"].CreateView(&viewDesc);
-
-#if defined(__EMSCRIPTEN__)
-            free(acAtlasImageData);
-#endif // __EMSCRIPTEN__
-
-#if defined(__EMSCRIPTEN__)
-            char* acFontInfoData = nullptr;
-            iFileSize = Loader::loadFile(&acFontInfoData, "glyph_info.bin");
-#else 
-            std::vector<char> acFontInfoDataV;
-            Loader::loadFile(acFontInfoDataV, "glyph_info.bin");
-            char* acFontInfoData = acFontInfoDataV.data();
-            iFileSize = (uint32_t)acFontInfoDataV.size();
-#endif // __EMSCRIPTEN__
-
-            bufferDesc.size = iFileSize;
-            bufferDesc.usage = (wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage);
-            maBuffers["font-info"] = mpDevice->CreateBuffer(&bufferDesc);
-            maBuffers["font-info"].SetLabel("Font Info Buffer");
-            mpDevice->GetQueue().WriteBuffer(maBuffers["font-info"], 0, acFontInfoData, iFileSize);
-
-            uint32_t iNumFontInfo = iFileSize / sizeof(OutputGlyphInfo);
-            maFontInfo.resize(iNumFontInfo);
-            memcpy(maFontInfo.data(), acFontInfoData, iFileSize);
-
-#if defined(__EMSCRIPTEN__)
-            free(acFontInfoData);
-#endif // __EMSCRIPTEN__
-
-            bufferDesc.size = sizeof(Vertex) * 4;
-            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
-            maBuffers["quad-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
-            maBuffers["quad-vertex-buffer"].SetLabel("Glyph Quad Vertex Buffer");
-
-            Vertex aVertices[4];
-            aVertices[0].mPosition = float4(-1.0f, 1.0f, 0.0f, 1.0f);
-            aVertices[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
-            aVertices[2].mPosition = float4(1.0f, -1.0f, 0.0f, 1.0f);
-            aVertices[3].mPosition = float4(1.0f, 1.0f, 0.0f, 1.0f);
-            aVertices[0].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-            aVertices[1].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-            aVertices[2].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-            aVertices[3].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
-            aVertices[0].mUV = float4(0.0f, 0.0f, 0.0f, 1.0f);
-            aVertices[1].mUV = float4(0.0f, 1.0f, 0.0f, 1.0f);
-            aVertices[2].mUV = float4(1.0f, 1.0f, 0.0f, 1.0f);
-            aVertices[3].mUV = float4(1.0f, 0.0f, 0.0f, 1.0f);
-            mpDevice->GetQueue().WriteBuffer(maBuffers["quad-vertex-buffer"], 0, aVertices, sizeof(aVertices));
-
-            bufferDesc.size = sizeof(uint32_t) * 6;
-            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index;
-            maBuffers["quad-index-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
-            maBuffers["quad-index-buffer"].SetLabel("Glyph Quad Index Buffer");
-
-            uint32_t aiIndices[6] = {0, 1, 2, 3, 2, 0};
-            mpDevice->GetQueue().WriteBuffer(maBuffers["quad-index-buffer"], 0, aiIndices, sizeof(aiIndices));
-
-            bufferDesc.size = 1024;
-            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
-            maBuffers["glyph-coordinates"] = mpDevice->CreateBuffer(&bufferDesc);
-            maBuffers["glyph-coordinates"].SetLabel("Glyph Coordinates");
-
-            bufferDesc.size = 64;
-            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
-            maBuffers["draw-text-uniform"] = mpDevice->CreateBuffer(&bufferDesc);
-            maBuffers["draw-text-uniform"].SetLabel("Draw Text Uniform Buffer");
-
-            setupFontPipeline();
-        }
+        loadMeshes();
+        loadTexturesIntoAtlas();
+        loadFont();
+        loadBVH();
+        loadExternalData();
 
         createRenderJobs(desc);
 
-        struct UniformData
-        {
-            uint32_t    miNumMeshes;
-            float       mfExplodeMultipler;
-        };
-
-        UniformData uniformData;
-        uniformData.miNumMeshes = (uint32_t)maMeshExtents.size();
-        uniformData.mfExplodeMultipler = 1.0f;
-        device.GetQueue().WriteBuffer(
-            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["uniformBuffer"],
-            0,
-            &uniformData,
-            sizeof(UniformData));
-        
-        bufferDesc = {};
-        bufferDesc.mappedAtCreation = false;
-        bufferDesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
-        bufferDesc.size = 1024;
-        mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
-        mOutputImageBuffer.SetLabel("Read Back Image Buffer");
+        setupUniformAndMiscBuffers();
 
         mLastTimeStart = std::chrono::high_resolution_clock::now();
 
@@ -738,6 +136,9 @@ namespace Render
     */
     void CRenderer::draw(DrawUpdateDescriptor& desc)
     {
+#if 0
+        static float3 sLightDirection = normalize(float3(-0.25f, 1.0f, 0.0f));
+
         DefaultUniformData defaultUniformData;
         defaultUniformData.mViewMatrix = *desc.mpViewMatrix;
         defaultUniformData.mProjectionMatrix = *desc.mpProjectionMatrix;
@@ -751,6 +152,10 @@ namespace Render
         defaultUniformData.mCameraPosition = float4(mCameraPosition, 1.0f);
         defaultUniformData.mCameraLookDir = float4(mCameraLookAt, 1.0f);
         defaultUniformData.miNumMeshes = (uint32_t)maMeshTriangleRanges.size();
+        defaultUniformData.mLightRadiance = float4(50.0f, 50.0f, 50.0f, 1.0f);
+
+        //sLightDirection = sLightDirection + float3(0.01f, 0.0f, -0.00f);
+        defaultUniformData.mLightDirection = float4(normalize(sLightDirection), 1.0f);
 
         // update default uniform buffer
         mpDevice->GetQueue().WriteBuffer(
@@ -759,6 +164,7 @@ namespace Render
             &defaultUniformData,
             sizeof(defaultUniformData)
         );
+#endif // #if 0
 
         // clear number of draw calls
         char acClearData[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -768,6 +174,16 @@ namespace Render
             acClearData,
             sizeof(acClearData)
         );
+
+        if(maBuffers.find("irradianceCacheQueueCounter") != maBuffers.end())
+        {
+            mpDevice->GetQueue().WriteBuffer(
+                maBuffers["irradianceCacheQueueCounter"],
+                0,
+                acClearData,
+                sizeof(acClearData)
+            );
+        }
 
         for(auto queuedData : maQueueData)
         {
@@ -786,6 +202,7 @@ namespace Render
             int32_t miSelectedMesh;
             int32_t miSelectionX;
             int32_t miSelectionY;
+            int32_t miPadding;
         };
 
         // fill out uniform data for buffer for highlighting mesh
@@ -798,13 +215,17 @@ namespace Render
                 uniformBuffer.miSelectionX = mSelectedCoord.x;
                 uniformBuffer.miSelectionY = mSelectedCoord.y;
                 uniformBuffer.miSelectedMesh = -1;
+                uniformBuffer.miPadding = 0;
 
-                mpDevice->GetQueue().WriteBuffer(
-                    maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
-                    0,
-                    &uniformBuffer,
-                    sizeof(MeshSelectionUniformData)
-                );
+                if(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end())
+                {
+                    mpDevice->GetQueue().WriteBuffer(
+                        maRenderJobs["Mesh Selection Graphics"]->mUniformBuffers["uniformBuffer"],
+                        0,
+                        &uniformBuffer,
+                        sizeof(MeshSelectionUniformData)
+                    );
+                }
 
                 mbWaitingForMeshSelection = true;
                 mSelectedCoord = int2(-1, -1);
@@ -900,6 +321,7 @@ namespace Render
             uniformBuffer.miSelectionX = mSelectedCoord.x;
             uniformBuffer.miSelectionY = mSelectedCoord.y;
             uniformBuffer.miSelectedMesh = mSelectMeshInfo.miMeshID;
+            uniformBuffer.miPadding = 0;
 
             printf("uniform selected mesh = %d\n", uniformBuffer.miSelectedMesh);
             mpDevice->GetQueue().WriteBuffer(
@@ -939,6 +361,9 @@ namespace Render
             wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
             if(pRenderJob->mType == Render::JobType::Graphics)
             {
+                uint32_t iOutputAttachmentWidth = pRenderJob->mOutputImageAttachments.begin()->second.GetWidth();
+                uint32_t iOutputAttachmentHeight = pRenderJob->mOutputImageAttachments.begin()->second.GetHeight();
+
                 wgpu::RenderPassDescriptor renderPassDesc = {};
                 renderPassDesc.colorAttachmentCount = pRenderJob->maOutputAttachments.size();
                 renderPassDesc.colorAttachments = pRenderJob->maOutputAttachments.data();
@@ -967,13 +392,13 @@ namespace Render
                 renderPassEncoder.SetScissorRect(
                     0,
                     0,
-                    mCreateDesc.miScreenWidth,
-                    mCreateDesc.miScreenHeight);
+                    iOutputAttachmentWidth,
+                    iOutputAttachmentHeight);
                 renderPassEncoder.SetViewport(
                     0,
                     0,
-                    (float)mCreateDesc.miScreenWidth,
-                    (float)mCreateDesc.miScreenHeight,
+                    (float)iOutputAttachmentWidth,
+                    (float)iOutputAttachmentHeight,
                     0.0f,
                     1.0f);
                 
@@ -1093,31 +518,65 @@ namespace Render
 
         }   // for all render jobs
 
+
         // get selection info from shader via read back buffer
-        if(mbWaitingForMeshSelection)
+        if(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end())
         {
-            wgpu::CommandEncoderDescriptor commandEncoderDesc = {};
-            wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
+            if(mbWaitingForMeshSelection)
+            {
+                wgpu::CommandEncoderDescriptor commandEncoderDesc = {};
+                wgpu::CommandEncoder commandEncoder = mpDevice->CreateCommandEncoder(&commandEncoderDesc);
 
-            commandEncoder.CopyBufferToBuffer(
-                maRenderJobs[mCaptureImageJobName]->mUniformBuffers[mCaptureUniformBufferName],
-                0,
-                mOutputImageBuffer,
-                0,
-                64
-            );
+                commandEncoder.CopyBufferToBuffer(
+                    maRenderJobs[mCaptureImageJobName]->mUniformBuffers[mCaptureUniformBufferName],
+                    0,
+                    mOutputImageBuffer,
+                    0,
+                    64
+                );
 
-            wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
-            aCommandBuffer.push_back(commandBuffer);
+                wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
+                aCommandBuffer.push_back(commandBuffer);
 
-            printf("copy selection buffer\n");
-            mbSelectedBufferCopied = true;
+                printf("copy selection buffer\n");
+                mbSelectedBufferCopied = true;
+            }
         }
+
 
         // submit all the job commands
         mpDevice->GetQueue().Submit(
             (uint32_t)aCommandBuffer.size(), 
             aCommandBuffer.data());
+
+
+        // test test test
+        //{
+        //    uint2 blueNoiseTextureSize = uint2(256, 256);
+        //
+        //    uint32_t iTileSize = 32u;
+        //    uint32_t iNumTilesX = (blueNoiseTextureSize.x / iTileSize);
+        //    uint32_t iNumTilesY = (blueNoiseTextureSize.y / iTileSize);
+        //    uint32_t iNumTotalTiles = iNumTilesX * iNumTilesY;
+        //    uint32_t iTileIndex = (uint32_t(miFrame) * 4) / (iTileSize * iTileSize);
+        //    uint32_t iTileIndexX = iTileIndex % iNumTilesX;
+        //    uint32_t iTileIndexY = (iTileIndex / iNumTilesX) % iNumTilesY;
+        //
+        //    for(uint32_t iSample = 0; iSample < 4; iSample++)
+        //    {
+        //        uint32_t iTotalSampleIndex = uint32_t(miFrame) * 4 + iSample;
+        //        uint32_t iOffsetX = (iTotalSampleIndex % iTileSize) + iTileIndexX * iTileSize;
+        //        uint32_t iOffsetY = ((iTotalSampleIndex / iTileSize) % iTileSize) + iTileIndexY * iTileSize;
+        //
+        //        DEBUG_PRINTF("offset(%d, %d) tile (%d, %d) frame: %d\n",
+        //            iOffsetX,
+        //            iOffsetY,
+        //            iTileIndexX,
+        //            iTileIndexY,
+        //            miFrame);
+        //    }
+        //    int iDebug = 1;
+        //}
 
         ++miFrame;
     }
@@ -1156,6 +615,14 @@ namespace Render
         };
         createInfo.mpUserData = this;
 
+        createInfo.mpfnGetTexture = [](std::string const& textureName, void* pUserData)
+        {
+            Render::CRenderer* pRenderer = (Render::CRenderer*)pUserData;
+            assert(pRenderer->maTextures.find(textureName) != pRenderer->maTextures.end());
+
+            return pRenderer->maTextures[textureName];
+        };
+
         rapidjson::Document doc;
         {
 #if defined(__EMSCRIPTEN__)
@@ -1172,6 +639,7 @@ namespace Render
         auto const& jobs = doc["Jobs"].GetArray();
         for(auto const& job : jobs)
         {
+            // job name and type
             createInfo.mName = job["Name"].GetString();
             std::string jobType = job["Type"].GetString();
             createInfo.mJobType = Render::JobType::Graphics;
@@ -1186,6 +654,7 @@ namespace Render
 
             maOrderedRenderJobs.push_back(createInfo.mName);
 
+            // pass type
             std::string passStr = job["PassType"].GetString();
             if(passStr == "Compute")
             {
@@ -1226,6 +695,7 @@ namespace Render
 
             aShaderModuleFilePath.push_back(pipelineFilePath);
 
+            // create output attachments first
             maRenderJobs[createInfo.mName] = std::make_unique<Render::CRenderJob>();
             maRenderJobs[createInfo.mName]->createWithOnlyOutputAttachments(createInfo);
 
@@ -1249,6 +719,7 @@ namespace Render
             apRenderJobs.push_back(maRenderJobs[renderJobName].get());
         }
 
+        // attach input attachments to output attachments from above, also set default uniform buffer
         createInfo.mpDrawTextOutputAttachment = &mFontOutputAttachment;
         createInfo.mpDefaultUniformBuffer = &maBuffers["default-uniform-buffer"];
         createInfo.mpaRenderJobs = &apRenderJobs;
@@ -1271,6 +742,46 @@ namespace Render
             ++iIndex;
         }
 
+        for(auto const& job : jobs)
+        {
+            if(job.HasMember("UniformData"))
+            {
+                std::string renderJobName = job["Name"].GetString();
+                std::string uniformBufferName = job["UniformData"]["Name"].GetString();
+                uint64_t iBufferOffset = job["UniformData"]["Offset"].GetUint64();
+                std::string dataType = job["UniformData"]["DataType"].GetString();
+                if(dataType == "float")
+                {
+                    float fData = job["UniformData"]["Data"].GetFloat();
+                    mpDevice->GetQueue().WriteBuffer(
+                        maRenderJobs[renderJobName]->mUniformBuffers[uniformBufferName],
+                        iBufferOffset,
+                        &fData,
+                        sizeof(fData));
+                }
+                else if(dataType == "uint")
+                {
+                    uint32_t iData = job["UniformData"]["Data"].GetUint();
+                    mpDevice->GetQueue().WriteBuffer(
+                        maRenderJobs[renderJobName]->mUniformBuffers[uniformBufferName],
+                        iBufferOffset,
+                        &iData,
+                        sizeof(iData));
+                }
+                else if(dataType == "int")
+                {
+                    int32_t iData = job["UniformData"]["Data"].GetInt();
+                    mpDevice->GetQueue().WriteBuffer(
+                        maRenderJobs[renderJobName]->mUniformBuffers[uniformBufferName],
+                        iBufferOffset,
+                        &iData,
+                        sizeof(iData));
+                }
+
+                
+            }
+        }
+
     }
 
     /*
@@ -1287,6 +798,16 @@ namespace Render
         //wgpu::Texture& swapChainTexture = maRenderJobs["TAA Graphics"]->mOutputImageAttachments["TAA Output"];
         //wgpu::Texture& swapChainTexture = maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments["Selection Output"];
         wgpu::Texture& swapChainTexture = maRenderJobs[mSwapChainRenderJobName]->mOutputImageAttachments[mSwapChainAttachmentName];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Diffuse Temporal Restir Graphics"]->mOutputImageAttachments["Radiance Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Diffuse Temporal Restir Graphics"]->mOutputImageAttachments["Sample Ray Direction Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Spherical Harmonics Diffuse Graphics"]->mOutputImageAttachments["Inverse Spherical Harmonics Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Direct Radiance Graphics"]->mOutputImageAttachments["Direct Radiance Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Debug Irradiance Cache Graphics"]->mOutputImageAttachments["Irradiance Cache Radiance Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Debug Ambient Occlusion Graphics"]->mOutputImageAttachments["Ambient Occlusion Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Ray Tracing Composite Graphics"]->mOutputImageAttachments["Ray Tracing Composite Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Emissive Temporal Restir Graphics"]->mOutputImageAttachments["Radiance Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Emissive Spatial Restir Graphics"]->mOutputImageAttachments["Radiance Output"];
+        //wgpu::Texture& swapChainTexture = maRenderJobs["Spherical Harmonics Emissive Graphics"]->mOutputImageAttachments["Emissive Inverse Spherical Harmonics Output"];
         //assert(maRenderJobs.find("Mesh Selection Graphics") != maRenderJobs.end());
         //assert(maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.find("Selection Output") != maRenderJobs["Mesh Selection Graphics"]->mOutputImageAttachments.end());
 
@@ -1711,6 +1232,898 @@ namespace Render
         wgpu::CommandBuffer commandBuffer = commandEncoder.Finish();
         aCommandBuffers.push_back(commandBuffer);
 
+    }
+
+    /*
+    **
+    */
+    void CRenderer::loadMeshes()
+    {
+        DEBUG_PRINTF("%s : %d\n", __FUNCTION__, __LINE__);
+
+#if defined(__EMSCRIPTEN__)
+        char* acTriangleBuffer = nullptr;
+        uint64_t iSize = Loader::loadFile(&acTriangleBuffer, mCreateDesc.mMeshFilePath + "-triangles.bin");
+        printf("acTriangleBuffer = 0x%X size: %lld\n", (uint32_t)acTriangleBuffer, iSize);
+        uint32_t const* piData = (uint32_t const*)acTriangleBuffer;
+#else 
+        std::vector<char> acTriangleBuffer;
+        Loader::loadFile(acTriangleBuffer, mCreateDesc.mMeshFilePath + "-triangles.bin");
+        uint32_t const* piData = (uint32_t const*)acTriangleBuffer.data();
+#endif // __EMSCRIPTEN__
+
+        uint32_t iNumMeshes = *piData++;
+        uint32_t iNumTotalVertices = *piData++;
+        uint32_t iNumTotalTriangles = *piData++;
+        uint32_t iVertexSize = *piData++;
+        uint32_t iTriangleStartOffset = *piData++;
+
+        printf("num meshes: %d\n", iNumMeshes);
+        printf("num total vertices: %d\n", iNumTotalVertices);
+
+        // triangle ranges for all the meshes
+        maMeshTriangleRanges.resize(iNumMeshes);
+        memcpy(maMeshTriangleRanges.data(), piData, sizeof(MeshTriangleRange) * iNumMeshes);
+        piData += (2 * iNumMeshes);
+
+        // the total mesh extent is at the very end of the list
+        MeshExtent const* pMeshExtent = (MeshExtent const*)piData;
+        maMeshExtents.resize(iNumMeshes + 1);
+        memcpy(maMeshExtents.data(), pMeshExtent, sizeof(MeshExtent) * (iNumMeshes + 1));
+        pMeshExtent += (iNumMeshes + 1);
+        mTotalMeshExtent = maMeshExtents.back();
+
+        // all the mesh vertices
+        std::vector<Vertex> aTotalMeshVertices(iNumTotalVertices);
+        Vertex const* pVertices = (Vertex const*)pMeshExtent;
+        memcpy(aTotalMeshVertices.data(), pVertices, iNumTotalVertices * sizeof(Vertex));
+        pVertices += iNumTotalVertices;
+
+        // all the triangle indices
+        std::vector<uint32_t> aiTotalMeshTriangleIndices(iNumTotalTriangles * 3);
+        piData = (uint32_t const*)pVertices;
+        memcpy(aiTotalMeshTriangleIndices.data(), piData, iNumTotalTriangles * 3 * sizeof(uint32_t));
+
+#if defined(__EMSCRIPTEN__)
+        Loader::loadFileFree(acTriangleBuffer);
+#endif // __EMSCRIPTEN__
+
+        wgpu::BufferDescriptor bufferDesc = {};
+
+        bufferDesc.size = iNumTotalVertices * sizeof(Vertex);
+        bufferDesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["train-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["train-vertex-buffer"].SetLabel("Train Vertex Buffer");
+        maBufferSizes["train-vertex-buffer"] = (uint32_t)bufferDesc.size;
+
+        bufferDesc.size = aiTotalMeshTriangleIndices.size() * sizeof(uint32_t);
+        bufferDesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["train-index-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["train-index-buffer"].SetLabel("Train Index Buffer");
+        maBufferSizes["train-index-buffer"] = (uint32_t)bufferDesc.size;
+
+        bufferDesc.size = iNumTotalVertices * sizeof(Vertex);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["meshTriangleIndexRanges"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["meshTriangleIndexRanges"].SetLabel("Mesh Triangle Ranges");
+        maBufferSizes["meshTriangleIndexRanges"] = (uint32_t)bufferDesc.size;
+
+        bufferDesc.size = (iNumMeshes + 1) * sizeof(MeshExtent);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["meshExtents"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["meshExtents"].SetLabel("Train Mesh Extents");
+        maBufferSizes["meshExtents"] = (uint32_t)bufferDesc.size;
+
+        mpDevice->GetQueue().WriteBuffer(maBuffers["train-vertex-buffer"], 0, aTotalMeshVertices.data(), iNumTotalVertices * sizeof(Vertex));
+        mpDevice->GetQueue().WriteBuffer(maBuffers["train-index-buffer"], 0, aiTotalMeshTriangleIndices.data(), aiTotalMeshTriangleIndices.size() * sizeof(uint32_t));
+        mpDevice->GetQueue().WriteBuffer(maBuffers["meshTriangleIndexRanges"], 0, maMeshTriangleRanges.data(), maMeshTriangleRanges.size() * sizeof(MeshTriangleRange));
+        mpDevice->GetQueue().WriteBuffer(maBuffers["meshExtents"], 0, maMeshExtents.data(), maMeshExtents.size() * sizeof(MeshExtent));
+
+        {
+#if defined(__EMSCRIPTEN__)
+            char* acMaterialID = nullptr;
+            bufferDesc.size = Loader::loadFile(&acMaterialID, mCreateDesc.mMeshFilePath + ".mid");
+#else 
+
+            std::vector<char> acMaterialID;
+            Loader::loadFile(acMaterialID, mCreateDesc.mMeshFilePath + ".mid");
+            bufferDesc.size = acMaterialID.size();
+#endif // __EMSCRIPTEN__
+
+            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+            maBuffers["meshMaterialIDs"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["meshMaterialIDs"].SetLabel("Mesh Material IDs");
+            maBufferSizes["meshEmeshMaterialIDsxtents"] = (uint32_t)bufferDesc.size;
+
+#if defined(__EMSCRIPTEN__)
+            mpDevice->GetQueue().WriteBuffer(
+                maBuffers["meshMaterialIDs"],
+                0,
+                acMaterialID,
+                bufferDesc.size);
+            Loader::loadFileFree(acMaterialID);
+#else
+            mpDevice->GetQueue().WriteBuffer(
+                maBuffers["meshMaterialIDs"],
+                0,
+                acMaterialID.data(),
+                acMaterialID.size());
+#endif // __EMSCRIPTEN__
+        }
+
+        {
+#if defined(__EMSCRIPTEN__)
+            char* acMaterials = nullptr;
+            bufferDesc.size = Loader::loadFile(&acMaterials, mCreateDesc.mMeshFilePath + ".mat");
+            printf("mesh material size: %d\n", (uint32_t)bufferDesc.size);
+#else
+            std::vector<char> acMaterials;
+            Loader::loadFile(acMaterials, mCreateDesc.mMeshFilePath + ".mat");
+
+            bufferDesc.size = acMaterials.size();
+#endif // __EMSCRIPTEN__
+            bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+            maBuffers["meshMaterials"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["meshMaterials"].SetLabel("Mesh Materials");
+            maBufferSizes["meshMaterials"] = (uint32_t)bufferDesc.size;
+
+#if defined(__EMSCRIPTEN__)
+            mpDevice->GetQueue().WriteBuffer(
+                maBuffers["meshMaterials"],
+                0,
+                acMaterials,
+                bufferDesc.size);
+            Loader::loadFileFree(acMaterials);
+#else 
+            mpDevice->GetQueue().WriteBuffer(
+                maBuffers["meshMaterials"],
+                0,
+                acMaterials.data(),
+                acMaterials.size());
+#endif // __EMSCRIPTEN__
+        }
+
+        bufferDesc.size = iNumMeshes * sizeof(uint32_t);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["visibilityFlags"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["visibilityFlags"].SetLabel("Mesh Visibility Flags");
+        maBufferSizes["visibilityFlags"] = (uint32_t)bufferDesc.size;
+    }
+
+    /*
+    **
+    */
+    // external data from external-data.json
+    void CRenderer::loadExternalData()
+    {
+        DEBUG_PRINTF("%s : %d\n", __FUNCTION__, __LINE__);
+
+        rapidjson::Document doc;
+
+#if defined(__EMSCRIPTEN__)
+        char* acFileContentBuffer = nullptr;
+        uint32_t iFileSize = Loader::loadFile(
+            &acFileContentBuffer,
+            "render-jobs/external-data.json",
+            true
+        );
+        assert(acFileContentBuffer);
+
+        DEBUG_PRINTF("loaded \"%s\" file size = %d\n", mCreateDesc.mRenderJobPipelineFilePath.c_str(), iFileSize);
+
+        doc.Parse(acFileContentBuffer);
+        DEBUG_PRINTF("%s : %d parsed\n", __FILE__, __LINE__);
+        Loader::loadFileFree(acFileContentBuffer);
+#else 
+        std::vector<char> acFileContentBuffer;
+        Loader::loadFile(
+            acFileContentBuffer,
+            "render-jobs/external-data.json",
+            true
+        );
+
+        doc.Parse(acFileContentBuffer.data());
+#endif //__EMSCRIPTEN__
+
+        auto externalDataEntries = doc["External Data"].GetArray();
+        for(auto& externalDataEntry : externalDataEntries)
+        {
+            std::string name = externalDataEntry["Name"].GetString();
+            std::string type = externalDataEntry["Type"].GetString();
+
+            if(type == "Buffer")
+            {
+                uint32_t iSize = 0;
+                if(externalDataEntry.HasMember("Size"))
+                {
+                    iSize = (uint32_t)externalDataEntry["Size"].GetUint();
+                }
+
+                wgpu::BufferDescriptor bufferDesc = {};
+                bufferDesc.size = iSize;
+                bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+                maBuffers[name] = mpDevice->CreateBuffer(&bufferDesc);
+                maBuffers[name].SetLabel(name.c_str());
+            }
+            else if(type == "Texture")
+            {
+                std::string fileName = externalDataEntry["File"].GetString();
+
+#if defined(__EMSCRIPTEN__)
+                char* acImageData = nullptr;
+                uint32_t iFileSize = Loader::loadFile(&acImageData, fileName);
+#else
+                std::vector<char> acBlueNoiseImageDataV;
+                Loader::loadFile(acBlueNoiseImageDataV, fileName);
+                char* acImageData = acBlueNoiseImageDataV.data();
+                uint32_t iFileSize = (uint32_t)acBlueNoiseImageDataV.size();
+#endif // __EMSCRIPTEN__
+
+                int32_t iImageWidth = 0, iImageHeight = 0, iNumComp = 0;
+                stbi_uc* pImageData = stbi_load_from_memory((stbi_uc const*)acImageData, iFileSize, &iImageWidth, &iImageHeight, &iNumComp, 4);
+
+                wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+                wgpu::TextureDescriptor textureDesc = {};
+                textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+                textureDesc.dimension = wgpu::TextureDimension::e2D;
+                textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+                textureDesc.mipLevelCount = 1;
+                textureDesc.sampleCount = 1;
+                textureDesc.size.depthOrArrayLayers = 1;
+                textureDesc.size.width = iImageWidth;
+                textureDesc.size.height = iImageHeight;
+                textureDesc.viewFormatCount = 1;
+                textureDesc.viewFormats = aViewFormats;
+                maTextures[name] = mpDevice->CreateTexture(&textureDesc);
+                maTextures[name].SetLabel(name.c_str());
+
+#if defined(__EMSCRIPTEN__)
+                wgpu::TextureDataLayout layout = {};
+#else
+                wgpu::TexelCopyBufferLayout layout = {};
+#endif // __EMSCRIPTEN__
+                layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
+                layout.offset = 0;
+                layout.rowsPerImage = iImageHeight;
+                wgpu::Extent3D extent = {};
+                extent.depthOrArrayLayers = 1;
+                extent.width = iImageWidth;
+                extent.height = iImageHeight;
+
+#if defined(__EMSCRIPTEN__)
+                wgpu::ImageCopyTexture destination = {};
+#else 
+                wgpu::TexelCopyTextureInfo destination = {};
+#endif // __EMSCRIPTEN__
+                destination.aspect = wgpu::TextureAspect::All;
+                destination.mipLevel = 0;
+                destination.origin = {.x = 0, .y = 0, .z = 0};
+                destination.texture = maTextures[name];
+                mpDevice->GetQueue().WriteTexture(
+                    &destination,
+                    pImageData,
+                    iImageWidth * iImageHeight * 4,
+                    &layout,
+                    &extent);
+
+                mpDevice->GetQueue().WriteTexture(
+                    &destination,
+                    pImageData,
+                    iImageWidth * iImageHeight * 4,
+                    &layout,
+                    &extent);
+
+#if defined(__EMSCRIPTEN__)
+                free(acImageData);
+#endif // __EMSCRIPTEN__
+            }
+            else if(type == "Render Target")
+            {
+                wgpu::TextureDescriptor textureDesc = {};
+                textureDesc.format = wgpu::TextureFormat::RGBA32Float;
+
+                std::string format = externalDataEntry["Format"].GetString();
+                if(format == "rgba32float")
+                {
+                    textureDesc.format = wgpu::TextureFormat::RGBA32Float;
+                }
+                else if(format == "rgba16float")
+                {
+                    textureDesc.format = wgpu::TextureFormat::RGBA16Float;
+                }
+                else if(format == "rg32float")
+                {
+                    textureDesc.format = wgpu::TextureFormat::RG32Float;
+                }
+                else if(format == "r32float")
+                {
+                    textureDesc.format = wgpu::TextureFormat::R32Float;
+                }
+                else
+                {
+                    assert(!"not handled");
+                }
+
+                uint32_t iWidth = mCreateDesc.miScreenWidth;
+                uint32_t iHeight = mCreateDesc.miScreenHeight;
+
+
+                if(externalDataEntry.HasMember("ScaleWidth"))
+                {
+                    float fScaleX = externalDataEntry["ScaleWidth"].GetFloat();
+                    iWidth = (uint32_t)(float(iWidth) * fScaleX);
+                }
+                if(externalDataEntry.HasMember("ScaleHeight"))
+                {
+                    float fScaleY = externalDataEntry["ScaleHeight"].GetFloat();
+                    iHeight = (uint32_t)(float(iWidth) * fScaleY);
+                }
+
+                wgpu::TextureFormat aViewFormats[] = {textureDesc.format};
+
+                textureDesc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding;
+                textureDesc.dimension = wgpu::TextureDimension::e2D;
+                textureDesc.mipLevelCount = 1;
+                textureDesc.sampleCount = 1;
+                textureDesc.size.depthOrArrayLayers = 1;
+                textureDesc.size.width = iWidth;
+                textureDesc.size.height = iHeight;
+                textureDesc.viewFormatCount = 1;
+                textureDesc.viewFormats = aViewFormats;
+                maTextures[name] = mpDevice->CreateTexture(&textureDesc);
+                maTextures[name].SetLabel(name.c_str());
+            }
+        }
+    }
+
+    /*
+    **
+    */
+    void CRenderer::loadBVH()
+    {
+        DEBUG_PRINTF("%s : %d\n", __FUNCTION__, __LINE__);
+
+        auto fileExtensionStart = mCreateDesc.mMeshFilePath.rfind(".");
+        std::string baseName = mCreateDesc.mMeshFilePath.substr(0, fileExtensionStart);
+        std::string bvhName = baseName + "-triangles.bvh";
+
+        DEBUG_PRINTF("%s : %d\n", __FILE__, __LINE__);
+
+#if defined(__EMSCRIPTEN__)
+        char* acBVHData = nullptr;
+        uint32_t iFileSize = Loader::loadFile(&acBVHData, bvhName.c_str());
+#else
+        std::vector<char> acBVHDataVector;
+        Loader::loadFile(acBVHDataVector, bvhName);
+        char* acBVHData = acBVHDataVector.data();
+        uint32_t iFileSize = (uint32_t)acBVHDataVector.size();
+#endif // __EMSCRIPTEN__
+
+        if(iFileSize <= 0)
+        {
+            DEBUG_PRINTF("no bvh data\n");
+        }
+        else
+        {
+            wgpu::BufferDescriptor bufferDesc = {};
+            bufferDesc.size = iFileSize;
+            bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+            maBuffers["bvhNodes"] = mpDevice->CreateBuffer(&bufferDesc);
+            maBuffers["bvhNodes"].SetLabel("BVH Buffer");
+            mpDevice->GetQueue().WriteBuffer(maBuffers["bvhNodes"], 0, acBVHData, iFileSize);
+        }
+
+#if defined(__EMSCRIPTEN__)
+        free(acBVHData);
+#endif // __EMSCRIPTEN__
+        
+    }
+
+    /*
+    **
+    */
+    void CRenderer::loadFont()
+    {
+        // font atlas
+        
+        DEBUG_PRINTF("%s : %d\n", __FUNCTION__, __LINE__);
+
+#if defined(__EMSCRIPTEN__)
+        char* acAtlasImageData = nullptr;
+        uint32_t iFileSize = Loader::loadFile(&acAtlasImageData, "font-atlas.png");
+#else 
+        std::vector<char> acAtlasImageDataV;
+        Loader::loadFile(acAtlasImageDataV, "font-atlas.png");
+        char* acAtlasImageData = acAtlasImageDataV.data();
+        uint32_t iFileSize = (uint32_t)acAtlasImageDataV.size();
+#endif // __EMSCRIPTEN__
+
+        int32_t iImageWidth = 0, iImageHeight = 0, iNumComp = 0;
+        stbi_uc* pImageData = stbi_load_from_memory(
+            (stbi_uc const*)acAtlasImageData,
+            (int32_t)iFileSize,
+            &iImageWidth,
+            &iImageHeight,
+            &iNumComp,
+            4
+        );
+
+        wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+        wgpu::TextureDescriptor textureDesc = {};
+        textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+        textureDesc.dimension = wgpu::TextureDimension::e2D;
+        textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        textureDesc.mipLevelCount = 1;
+        textureDesc.sampleCount = 1;
+        textureDesc.size.depthOrArrayLayers = 1;
+        textureDesc.size.width = iImageWidth;
+        textureDesc.size.height = iImageHeight;
+        textureDesc.viewFormatCount = 1;
+        textureDesc.viewFormats = aViewFormats;
+        maTextures["font-atlas-image"] = mpDevice->CreateTexture(&textureDesc);
+        maTextures["font-atlas-image"].SetLabel("Font Atlas");
+
+#if defined(__EMSCRIPTEN__)
+        wgpu::TextureDataLayout layout = {};
+#else
+        wgpu::TexelCopyBufferLayout layout = {};
+#endif // __EMSCRIPTEN__
+        layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
+        layout.offset = 0;
+        layout.rowsPerImage = iImageHeight;
+        wgpu::Extent3D extent = {};
+        extent.depthOrArrayLayers = 1;
+        extent.width = iImageWidth;
+        extent.height = iImageHeight;
+
+#if defined(__EMSCRIPTEN__)
+        wgpu::ImageCopyTexture destination = {};
+#else 
+        wgpu::TexelCopyTextureInfo destination = {};
+#endif // __EMSCRIPTEN__
+        destination.aspect = wgpu::TextureAspect::All;
+        destination.mipLevel = 0;
+        destination.origin = {.x = 0, .y = 0, .z = 0, };
+        destination.texture = maTextures["font-atlas-image"];
+        mpDevice->GetQueue().WriteTexture(
+            &destination,
+            pImageData,
+            iImageWidth * iImageHeight * 4,
+            &layout,
+            &extent);
+        stbi_image_free(pImageData);
+
+        wgpu::TextureViewDescriptor viewDesc = {};
+        viewDesc.arrayLayerCount = 1;
+        viewDesc.aspect = wgpu::TextureAspect::All;
+        viewDesc.baseArrayLayer = 0;
+        viewDesc.baseMipLevel = 0;
+        viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+        viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        viewDesc.label = "Font Texture Atlas";
+        viewDesc.mipLevelCount = 1;
+#if !defined(__EMSCRIPTEN__)
+        viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+#endif // __EMSCRIPTEN__
+        maTextureViews["font-atlas-image"] = maTextures["font-atlas-image"].CreateView(&viewDesc);
+
+#if defined(__EMSCRIPTEN__)
+        free(acAtlasImageData);
+#endif // __EMSCRIPTEN__
+
+#if defined(__EMSCRIPTEN__)
+        char* acFontInfoData = nullptr;
+        iFileSize = Loader::loadFile(&acFontInfoData, "glyph_info.bin");
+#else 
+        std::vector<char> acFontInfoDataV;
+        Loader::loadFile(acFontInfoDataV, "glyph_info.bin");
+        char* acFontInfoData = acFontInfoDataV.data();
+        iFileSize = (uint32_t)acFontInfoDataV.size();
+#endif // __EMSCRIPTEN__
+
+        wgpu::BufferDescriptor bufferDesc = {};
+        bufferDesc.size = iFileSize;
+        bufferDesc.usage = (wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage);
+        maBuffers["font-info"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["font-info"].SetLabel("Font Info Buffer");
+        mpDevice->GetQueue().WriteBuffer(maBuffers["font-info"], 0, acFontInfoData, iFileSize);
+
+        uint32_t iNumFontInfo = iFileSize / sizeof(OutputGlyphInfo);
+        maFontInfo.resize(iNumFontInfo);
+        memcpy(maFontInfo.data(), acFontInfoData, iFileSize);
+
+#if defined(__EMSCRIPTEN__)
+        free(acFontInfoData);
+#endif // __EMSCRIPTEN__
+
+        bufferDesc.size = sizeof(Vertex) * 4;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Vertex;
+        maBuffers["quad-vertex-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["quad-vertex-buffer"].SetLabel("Glyph Quad Vertex Buffer");
+
+        Vertex aVertices[4];
+        aVertices[0].mPosition = float4(-1.0f, 1.0f, 0.0f, 1.0f);
+        aVertices[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
+        aVertices[2].mPosition = float4(1.0f, -1.0f, 0.0f, 1.0f);
+        aVertices[3].mPosition = float4(1.0f, 1.0f, 0.0f, 1.0f);
+        aVertices[0].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aVertices[1].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aVertices[2].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aVertices[3].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aVertices[0].mUV = float4(0.0f, 0.0f, 0.0f, 1.0f);
+        aVertices[1].mUV = float4(0.0f, 1.0f, 0.0f, 1.0f);
+        aVertices[2].mUV = float4(1.0f, 1.0f, 0.0f, 1.0f);
+        aVertices[3].mUV = float4(1.0f, 0.0f, 0.0f, 1.0f);
+        mpDevice->GetQueue().WriteBuffer(maBuffers["quad-vertex-buffer"], 0, aVertices, sizeof(aVertices));
+
+        bufferDesc.size = sizeof(uint32_t) * 6;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index;
+        maBuffers["quad-index-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["quad-index-buffer"].SetLabel("Glyph Quad Index Buffer");
+
+        uint32_t aiIndices[6] = {0, 1, 2, 3, 2, 0};
+        mpDevice->GetQueue().WriteBuffer(maBuffers["quad-index-buffer"], 0, aiIndices, sizeof(aiIndices));
+
+        bufferDesc.size = 1024;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+        maBuffers["glyph-coordinates"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["glyph-coordinates"].SetLabel("Glyph Coordinates");
+
+        bufferDesc.size = 64;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+        maBuffers["draw-text-uniform"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["draw-text-uniform"].SetLabel("Draw Text Uniform Buffer");
+
+        setupFontPipeline();
+        
+    }
+
+    /*
+    **
+    */
+    void CRenderer::loadTexturesIntoAtlas()
+    {
+        DEBUG_PRINTF("%s : %d\n", __FUNCTION__, __LINE__);
+
+        struct TextureAtlasInfo
+        {
+            uint2               miTextureCoord;
+            float2              mUV;
+            uint32_t            miTextureID;
+            uint32_t            miImageWidth;
+            uint32_t            miImageHeight;
+            uint32_t            miPadding0;
+        };
+
+        std::vector<TextureAtlasInfo> aTextureAtlasInfo;
+        std::vector<std::string> aDiffuseTextureNames;
+        std::vector<std::string> aEmissiveTextureNames;
+        std::vector<std::string> aSpecularTextureNames;
+        std::vector<std::string> aNormalTextureNames;
+        {
+            // diffuse texture atlas
+            int32_t iAtlasImageWidth = 8192;
+            int32_t iAtlasImageHeight = 8192;
+            wgpu::TextureFormat aViewFormats[] = {wgpu::TextureFormat::RGBA8Unorm};
+            wgpu::TextureDescriptor textureDesc = {};
+            textureDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+            textureDesc.dimension = wgpu::TextureDimension::e2D;
+            textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+            textureDesc.mipLevelCount = 1;
+            textureDesc.sampleCount = 1;
+            textureDesc.size.depthOrArrayLayers = 1;
+            textureDesc.size.width = iAtlasImageWidth;
+            textureDesc.size.height = iAtlasImageHeight;
+            textureDesc.viewFormatCount = 1;
+            textureDesc.viewFormats = aViewFormats;
+
+            maTextures["totalDiffuseTextures"] = mpDevice->CreateTexture(&textureDesc);
+            mDiffuseTextureAtlas = maTextures["totalDiffuseTextures"];
+
+
+#if defined(__EMSCRIPTEN__)
+            char* acTextureNames = nullptr;
+            uint32_t iSize = Loader::loadFile(&acTextureNames, mCreateDesc.mMeshFilePath + "-texture-names.tex");
+            if(iSize > 0)
+#else 
+            std::vector<char> acTextureNames;
+            Loader::loadFile(acTextureNames, mCreateDesc.mMeshFilePath + "-texture-names.tex");
+            if(acTextureNames.size() > 0)
+#endif // __EMSCRIPTEN__
+            {
+                uint32_t iDiffuseSignature = ('D') | ('F' << 8) | ('S' << 16) | ('E' << 24);
+                uint32_t iEmissiveSignature = ('E') | ('M' << 8) | ('S' << 16) | ('V' << 24);
+                uint32_t iSpecularSignature = ('S') | ('P' << 8) | ('C' << 16) | ('L' << 24);
+                uint32_t iNormalSignature = ('N') | ('R' << 8) | ('M' << 16) | ('L' << 24);
+
+#if defined(__EMSCRIPTEN__)
+                uint32_t const* piData = (uint32_t const*)acTextureNames;
+                char const* pcEnd = ((char const*)piData) + iSize;
+#else 
+                uint32_t const* piData = (uint32_t const*)acTextureNames.data();
+                char const* pcEnd = ((char const*)piData) + acTextureNames.size();
+#endif // __EMSCRIPTEN__
+                for(uint32_t iType = 0; iType < 4; iType++)
+                {
+                    uint32_t iSignature = *piData++;
+                    uint32_t iNumTextures = *piData++;
+                    char const* pcChar = (char const*)piData;
+                    for(uint32_t i = 0; i < iNumTextures; i++)
+                    {
+                        std::vector<char> acName;
+                        while(*pcChar != '\0')
+                        {
+                            acName.push_back(*pcChar++);
+                        }
+                        acName.push_back(*pcChar++);
+
+                        std::string convertedName = std::string(acName.data());
+                        auto iter = convertedName.rfind("/");
+                        if(iter == std::string::npos)
+                        {
+                            iter = convertedName.rfind("\\");
+                        }
+
+                        std::string baseName = convertedName;
+                        if(iter != std::string::npos)
+                        {
+                            baseName = convertedName.substr(iter);
+                        }
+                        iter = baseName.rfind(".");
+                        std::string noExtension = baseName.substr(0, iter);
+                        std::string oldFileExtension = baseName.substr(iter);
+
+                        if(oldFileExtension != ".jpeg" && oldFileExtension != ".png" && oldFileExtension != ".jpg")
+                        {
+                            noExtension += ".png";
+                        }
+                        else
+                        {
+                            noExtension += oldFileExtension;
+                        }
+
+                        if(iSignature == iDiffuseSignature)
+                        {
+                            aDiffuseTextureNames.push_back(noExtension);
+                        }
+                        else if(iSignature == iEmissiveSignature)
+                        {
+                            aEmissiveTextureNames.push_back(noExtension);
+                        }
+                        else if(iSignature == iSpecularSignature)
+                        {
+                            aSpecularTextureNames.push_back(noExtension);
+                        }
+                        else if(iSignature == iNormalSignature)
+                        {
+                            aNormalTextureNames.push_back(noExtension);
+                        }
+                    }
+                    piData = (uint32_t const*)pcChar;
+                    if(pcChar == pcEnd)
+                    {
+                        break;
+                    }
+
+                }   // for texture type
+
+#if defined(__EMSCRIPTEN__)
+                free(acTextureNames);
+#endif // __EMSCRIPTEN__
+
+                int32_t iAtlasIndex = 0;
+                int32_t iX = 0, iY = 0;
+                int32_t iLargestHeight = 0;
+
+                auto copyToAtlas = [&](
+                    int32_t& iX,
+                    int32_t& iY,
+                    int32_t iAtlasImageWidth,
+                    int32_t iAtlasImageHeight,
+                    std::string const& textureName,
+                    wgpu::Texture& textureAtlas,
+                    int32_t& iLargestHeight)
+                    {
+                        std::string parsedTextureName = std::string("textures/") + textureName;
+
+#if defined(__EMSCRIPTEN__)
+                        char* acTextureImageData = nullptr;
+                        uint32_t iSize = Loader::loadFile(&acTextureImageData, parsedTextureName);
+                        int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
+                        stbi_uc* pImageData = stbi_load_from_memory(
+                            (stbi_uc const*)acTextureImageData,
+                            (int32_t)iSize,
+                            &iImageWidth,
+                            &iImageHeight,
+                            &iImageComp,
+                            4
+                        );
+#else
+                        std::vector<char> acTextureImageData;
+                        Loader::loadFile(acTextureImageData, parsedTextureName);
+                        int32_t iImageWidth = 0, iImageHeight = 0, iImageComp = 0;
+                        stbi_uc* pImageData = stbi_load_from_memory(
+                            (stbi_uc const*)acTextureImageData.data(),
+                            (int32_t)acTextureImageData.size(),
+                            &iImageWidth,
+                            &iImageHeight,
+                            &iImageComp,
+                            4
+                        );
+#endif // __EMSCRIPTEN__
+
+                        if(pImageData)
+                        {
+                            iLargestHeight = std::max(iLargestHeight, iImageHeight);
+                            if(iX + iImageWidth >= iAtlasImageWidth)
+                            {
+                                iX = 0;
+                                iY += iLargestHeight;
+                                iLargestHeight = 0;
+                            }
+
+#if defined(__EMSCRIPTEN__)
+                            wgpu::TextureDataLayout layout = {};
+#else
+                            wgpu::TexelCopyBufferLayout layout = {};
+#endif // __EMSCRIPTEN__
+                            layout.bytesPerRow = iImageWidth * 4 * sizeof(char);
+                            layout.offset = 0;
+                            layout.rowsPerImage = iImageHeight;
+                            wgpu::Extent3D extent = {};
+                            extent.depthOrArrayLayers = 1;
+                            extent.width = iImageWidth;
+                            extent.height = iImageHeight;
+
+#if defined(__EMSCRIPTEN__)
+                            wgpu::ImageCopyTexture destination = {};
+#else 
+                            wgpu::TexelCopyTextureInfo destination = {};
+#endif // __EMSCRIPTEN__
+                            destination.aspect = wgpu::TextureAspect::All;
+                            destination.mipLevel = 0;
+                            destination.origin = {.x = (uint32_t)iX, .y = (uint32_t)iY, .z = 0};
+                            destination.texture = textureAtlas;
+                            mpDevice->GetQueue().WriteTexture(
+                                &destination,
+                                pImageData,
+                                iImageWidth * iImageHeight * 4,
+                                &layout,
+                                &extent);
+
+                            TextureAtlasInfo info = {};
+                            info.miTextureCoord = uint2(iX, iY);
+                            info.miTextureID = iAtlasIndex;
+                            info.mUV = float2(float(iX) / float(iAtlasImageWidth), float(iY) / float(iAtlasImageHeight));
+                            info.miImageWidth = iImageWidth;
+                            info.miImageHeight = iImageHeight;
+                            aTextureAtlasInfo.push_back(info);
+
+                            iX += iImageWidth;
+
+                            stbi_image_free(pImageData);
+
+#if defined(__EMSCRIPTEN__)
+                            free(acTextureImageData);
+#endif // __EMSCRIPTEN__
+                        }
+                        else
+                        {
+                            DEBUG_PRINTF("!!! Can\'t load \"%s\"\n", parsedTextureName.c_str());
+                        }
+                    };
+
+
+                for(auto const& diffuseTextureName : aDiffuseTextureNames)
+                {
+                    copyToAtlas(iX, iY, iAtlasImageWidth, iAtlasImageHeight, diffuseTextureName, mDiffuseTextureAtlas, iLargestHeight);
+
+                    ++iAtlasIndex;
+                }
+
+            }
+
+        }   // textures
+
+        wgpu::TextureViewDescriptor viewDesc = {};
+        viewDesc.arrayLayerCount = 1;
+        viewDesc.aspect = wgpu::TextureAspect::All;
+        viewDesc.baseArrayLayer = 0;
+        viewDesc.baseMipLevel = 0;
+        viewDesc.dimension = wgpu::TextureViewDimension::e2D;
+        viewDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+        viewDesc.label = "Diffuse Texture Atlas";
+        viewDesc.mipLevelCount = 1;
+#if !defined(__EMSCRIPTEN__)
+        viewDesc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+#endif // __EMSCRIPTEN__
+        mDiffuseTextureAtlasView = mDiffuseTextureAtlas.CreateView(&viewDesc);
+
+        wgpu::BufferDescriptor bufferDesc = {};
+        bufferDesc.mappedAtCreation = false;
+        bufferDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+        bufferDesc.size = std::max((uint32_t)sizeof(TextureAtlasInfo) * (uint32_t)aTextureAtlasInfo.size(), 64u);
+        maBuffers["diffuseTextureAtlasInfoBuffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["diffuseTextureAtlasInfoBuffer"].SetLabel("Diffuse Texture Atlas Info Buffer");
+        mpDevice->GetQueue().WriteBuffer(
+            maBuffers["diffuseTextureAtlasInfoBuffer"],
+            0,
+            aTextureAtlasInfo.data(),
+            sizeof(TextureAtlasInfo) * (uint32_t)aTextureAtlasInfo.size()
+        );
+    }
+
+    /*
+    **
+    */
+    void CRenderer::setupUniformAndMiscBuffers()
+    {
+        struct UniformData
+        {
+            uint32_t    miNumMeshes;
+            float       mfExplodeMultipler;
+        };
+
+        UniformData uniformData;
+        uniformData.miNumMeshes = (uint32_t)maMeshExtents.size();
+        uniformData.mfExplodeMultipler = 1.0f;
+        mpDevice->GetQueue().WriteBuffer(
+            maRenderJobs["Mesh Culling Compute"]->mUniformBuffers["uniformBuffer"],
+            0,
+            &uniformData,
+            sizeof(UniformData));
+
+        wgpu::BufferDescriptor bufferDesc = {};
+        bufferDesc.mappedAtCreation = false;
+        bufferDesc.usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst;
+        bufferDesc.size = 1024;
+        mOutputImageBuffer = mpDevice->CreateBuffer(&bufferDesc);
+        mOutputImageBuffer.SetLabel("Read Back Image Buffer");
+    }
+
+    /*
+    **
+    */
+    void CRenderer::createMiscBuffers()
+    {
+        wgpu::BufferDescriptor bufferDesc = {};
+
+        // default uniform buffer
+        bufferDesc.size = sizeof(DefaultUniformData);
+        bufferDesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+        maBuffers["default-uniform-buffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["default-uniform-buffer"].SetLabel("Default Uniform Buffer");
+        maBufferSizes["default-uniform-buffer"] = (uint32_t)bufferDesc.size;
+
+        // full screen triangle
+        Vertex aFullScreenTriangles[3];
+        aFullScreenTriangles[0].mPosition = float4(-1.0f, 3.0f, 0.0f, 1.0f);
+        aFullScreenTriangles[0].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aFullScreenTriangles[0].mUV = float4(0.0f, -1.0f, 0.0f, 0.0f);
+
+        aFullScreenTriangles[1].mPosition = float4(-1.0f, -1.0f, 0.0f, 1.0f);
+        aFullScreenTriangles[1].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aFullScreenTriangles[1].mUV = float4(0.0f, 1.0f, 0.0f, 0.0f);
+
+        aFullScreenTriangles[2].mPosition = float4(3.0f, -1.0f, 0.0f, 1.0f);
+        aFullScreenTriangles[2].mNormal = float4(0.0f, 0.0f, 1.0f, 1.0f);
+        aFullScreenTriangles[2].mUV = float4(2.0f, 1.0f, 0.0f, 0.0f);
+
+        bufferDesc.size = sizeof(Vertex) * 3;
+        maBuffers["full-screen-triangle"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["full-screen-triangle"].SetLabel("Full Screen Triangle Buffer");
+        maBufferSizes["full-screen-triangle"] = (uint32_t)bufferDesc.size;
+        mpDevice->GetQueue().WriteBuffer(
+            maBuffers["full-screen-triangle"],
+            0,
+            aFullScreenTriangles,
+            3 * sizeof(Vertex));
+
+        bufferDesc.size = 256 * sizeof(float2);
+        bufferDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        maBuffers["blueNoiseBuffer"] = mpDevice->CreateBuffer(&bufferDesc);
+        maBuffers["blueNoiseBuffer"].SetLabel("Blue Noise Buffer");
+        maBufferSizes["blueNoiseBuffer"] = (uint32_t)bufferDesc.size;
     }
 
 }   // Render

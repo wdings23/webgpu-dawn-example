@@ -79,6 +79,7 @@ std::vector<float2> gaBlueNoise;
 float3 gMeshMidPt;
 float gfMeshRadius;
 uint32_t giCameraMode = PROJECTION_ORTHOGRAPHIC;
+float3 gLightDirection;
 
 struct AOUniformData
 {
@@ -350,6 +351,55 @@ void render()
     drawDesc.mpPrevViewProjectionMatrix = &gPrevViewProjectionMatrix;
     drawDesc.mpCameraPosition = &gCamera.getPosition();
     drawDesc.mpCameraLookAt = &gCamera.getLookAt();
+
+    // update default uniform buffer
+    {
+        struct DefaultUniformData
+        {
+            int32_t miScreenWidth = 0;
+            int32_t miScreenHeight = 0;
+            int32_t miFrame = 0;
+            uint32_t miNumMeshes = 0;
+
+            float mfRand0 = 0.0f;
+            float mfRand1 = 0.0f;
+            float mfRand2 = 0.0f;
+            float mfRand3 = 0.0f;
+
+            float4x4 mViewProjectionMatrix;
+            float4x4 mPrevViewProjectionMatrix;
+            float4x4 mViewMatrix;
+            float4x4 mProjectionMatrix;
+
+            float4x4 mJitteredViewProjectionMatrix;
+            float4x4 mPrevJitteredViewProjectionMatrix;
+
+            float4 mCameraPosition;
+            float4 mCameraLookDir;
+
+            float4 mLightRadiance;
+            float4 mLightDirection;
+        };
+
+        DefaultUniformData defaultUniformData;
+        defaultUniformData.mViewMatrix = *drawDesc.mpViewMatrix;
+        defaultUniformData.mProjectionMatrix = *drawDesc.mpProjectionMatrix;
+        defaultUniformData.mViewProjectionMatrix = *drawDesc.mpViewProjectionMatrix;
+        defaultUniformData.mPrevViewProjectionMatrix = *drawDesc.mpPrevViewProjectionMatrix;
+        defaultUniformData.mJitteredViewProjectionMatrix = *drawDesc.mpViewProjectionMatrix;
+        defaultUniformData.mPrevJitteredViewProjectionMatrix = *drawDesc.mpPrevViewProjectionMatrix;
+        defaultUniformData.miScreenWidth = kWidth;
+        defaultUniformData.miScreenHeight = kHeight;
+        defaultUniformData.miFrame = gRenderer.getFrameIndex();
+        defaultUniformData.mCameraPosition = float4(*drawDesc.mpCameraPosition, 1.0f);
+        defaultUniformData.mCameraLookDir = float4(*drawDesc.mpCameraLookAt, 1.0f);
+        defaultUniformData.miNumMeshes = gRenderer.getNumMeshes();
+        defaultUniformData.mLightRadiance = float4(50.0f, 50.0f, 50.0f, 1.0f);
+        defaultUniformData.mLightDirection = float4(normalize(gLightDirection), 1.0f);
+
+        gRenderer.setBufferData("default-uniform-buffer", &defaultUniformData, 0, sizeof(DefaultUniformData));
+    }
+    
     gRenderer.draw(drawDesc);
 
     gPrevViewProjectionMatrix = gCamera.getViewProjectionMatrix();
@@ -930,6 +980,8 @@ void start()
         data.miSize = (uint32_t)sizeof(OutlineUniformData);
         data.mpData = &gOutlineUniformData;
         gRenderer.addQueueData(data);
+
+        gLightDirection = normalize(float3(-0.25f, 1.0f, 0.0f));
 
     }
 

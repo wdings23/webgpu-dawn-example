@@ -12,22 +12,22 @@
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Composite Output",
             "Type": "TextureInput",
-            "ParentJob": "Composite Graphics"
+            "ParentJobName": "Composite Graphics"
         },
         {
             "Name" : "Previous TAA Output",
             "Type": "TextureInput",
-            "ParentJob": "Copy Render Targets"
+            "ParentJobName": "Copy Render Targets"
         },
         {
             "Name" : "Motion Vector Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         }
     ],
     "BlendStates": [

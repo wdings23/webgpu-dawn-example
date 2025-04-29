@@ -12,18 +12,18 @@
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Front Face World Position Output",
             "ParentName": "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Front Face Graphics"
+            "ParentJobName": "Deferred Indirect Front Face Graphics"
         },
         {
             "Name" : "Slice Output",
             "Type": "TextureInput",
-            "ParentJob": "Cross Section Graphics"
+            "ParentJobName": "Cross Section Graphics"
         }
     ],
     "ShaderResources": [

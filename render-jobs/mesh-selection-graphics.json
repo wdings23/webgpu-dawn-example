@@ -12,12 +12,12 @@
         {
             "Name" : "World Position Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         },
         {
             "Name" : "Material Output",
             "Type": "TextureInput",
-            "ParentJob": "Deferred Indirect Graphics"
+            "ParentJobName": "Deferred Indirect Graphics"
         }
     ],
     "ShaderResources": [

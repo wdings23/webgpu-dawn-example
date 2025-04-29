@@ -12,6 +12,8 @@
 
 #include <tinyexr/miniz.h>
 
+#include <utils/LogPrint.h>
+
 namespace Loader
 {
     // Callback function to write data to file
@@ -79,6 +81,9 @@ namespace Loader
         auto fileExtensionStart = filePath.rfind(".") - 1;
         auto directoryEnd = filePath.rfind("/");
         std::string baseName = filePath.substr(directoryEnd + 1, fileExtensionStart - directoryEnd);
+        std::string fileName = filePath.substr(directoryEnd + 1);
+
+        DEBUG_PRINTF("%s : %d fileName: %s\n", __FILE__, __LINE__, fileName.c_str());
 
         bool bZipFile = false;
         FILE* fp = fopen(filePath.c_str(), "rb");
@@ -126,7 +131,7 @@ namespace Loader
 
         if(bZipFile)
         {
-            std::string fileName = baseName + ".bin";
+            //std::string fileName = baseName + ".bin";
             printf("%s : %d zip file to extract: %s\n",
                 __FILE__,
                 __LINE__,
@@ -148,11 +153,12 @@ namespace Loader
             int32_t iFileIndex = mz_zip_reader_locate_file(&zipArchive, fileName.c_str(), nullptr, 0);
             if(iFileIndex == -1)
             {
-                printf("%s : %d can\'t find file \"%s\"\n",
+                printf("!!! %s : %d can\'t find file \"%s\" !!!\n",
                     __FILE__,
                     __LINE__,
                     fileName.c_str());
-                assert(0);
+
+                return 0;
             }
             printf("%s : %d file index = %d\n",
                 __FILE__,
@@ -235,34 +241,46 @@ namespace Loader
 
 #else 
 
-    /*
-    **
-    */
-    void loadFile(
-        std::vector<char>& acFileContentBuffer,
-        std::string const& filePath,
-        bool bTextFile)
+/*
+**
+*/
+void loadFile(
+    std::vector<char>& acFileContentBuffer,
+    std::string const& filePath,
+    bool bTextFile)
+{
+    std::string url = "http://127.0.0.1:8000/" + filePath;
+
+    CURL* curl;
+    CURLcode res;
+
+    curl = curl_easy_init();
+    if(curl)
     {
-        std::string url = "http://127.0.0.1:8080/" + filePath;
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &acFileContentBuffer);
 
-        CURL* curl;
-        CURLcode res;
+        res = curl_easy_perform(curl);
 
-        curl = curl_easy_init();
-        if(curl)
+        if(acFileContentBuffer.size() <= 0)
         {
+            url = "http://127.0.0.1:8080/" + filePath;
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &acFileContentBuffer);
             res = curl_easy_perform(curl);
-
-            curl_easy_cleanup(curl);
         }
-
-        if(bTextFile)
+        else
         {
-            acFileContentBuffer.push_back(0);
+            int iDebug = 1;
         }
+
+        curl_easy_cleanup(curl);
     }
+
+    if(bTextFile)
+    {
+        acFileContentBuffer.push_back(0);
+    }
+}
 #endif // __EMSCRIPTEN__
 }
