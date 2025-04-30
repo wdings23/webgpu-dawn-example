@@ -209,15 +209,27 @@ int main(int argc, char* argv[])
     float3 totalMinPos = float3(FLT_MAX, FLT_MAX, FLT_MAX);
     float3 totalMaxPos = float3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
+    bool bSingleMeshModel = false;
+    extensionIter = fileName.rfind(".obj");
+    if(extensionIter != std::string::npos)
+    {
+        bSingleMeshModel = true;
+    }
+
     float fZMult = 1.0f;
 
     for(auto const& entry : std::filesystem::directory_iterator(directory))
     {
         std::string path = entry.path().string().c_str();
 
-        std::string fileName = path.substr(iter + 1);
-        auto extensionIter = fileName.rfind(".obj");
+        std::string currFileName = path.substr(iter);
+        extensionIter = currFileName.rfind(".obj");
         if(extensionIter == std::string::npos)
+        {
+            continue;
+        }
+
+        if(bSingleMeshModel && currFileName != fileName)
         {
             continue;
         }
@@ -242,7 +254,7 @@ int main(int argc, char* argv[])
             return baseName;
         };
 
-        std::string baseName = fileName.substr(0, extensionIter);
+        std::string baseName = currFileName.substr(0, extensionIter);
 
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
